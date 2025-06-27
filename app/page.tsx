@@ -1245,8 +1245,8 @@ export default function CloudInterface() {
                           onChange={(e) => updateDockerImage(image.id, "name", e.target.value)}
                         />
                       </div>
-                      <div className="flex-1 space-y-2">
-                        <Label>Imagen {index + 1}</Label>
+                      <div className="w-44 space-y-2">
+                        <Label>port {index + 1}</Label>
                         <Input
                           placeholder="443, 80, 5432"
                           value={image.port}
@@ -1254,7 +1254,7 @@ export default function CloudInterface() {
                         />
                       </div>
                       <div className="w-32 space-y-2">
-                        <Label>Tag</Label>
+                        <Label>Tag  {index + 1}</Label>
                         <Input
                           placeholder="latest"
                           value={image.tag}
