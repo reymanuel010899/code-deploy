@@ -1457,6 +1457,70 @@ export default function CloudInterface() {
               </CardContent>
             </Card>
 
+            {/* Docker Images Configuration - Only show for EC2 and ECS */}
+            {(selectedService === "ec2" || selectedService === "ecs") && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Container className="h-5 w-5" />
+                    Imágenes Docker
+                  </CardTitle>
+                  <CardDescription>Configura hasta 3 imágenes Docker para tu aplicación</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {dockerImages.map((image, index) => (
+                    <div key={image.id} className="flex gap-3 items-end">
+                      <div className="flex-1 space-y-2">
+                        <Label>Imagen {index + 1}</Label>
+                        <Input
+                          placeholder="nginx, node:18, postgres:15"
+                          value={image.name}
+                          onChange={(e) => updateDockerImage(image.id, "name", e.target.value)}
+                        />
+                      </div>
+                      <div className="w-44 space-y-2">
+                        <Label>port {index + 1}</Label>
+                        <Input
+                          placeholder="443, 80, 5432"
+                          value={image.port}
+                          onChange={(e) => updateDockerImage(image.id, "port", e.target.value)}
+                        />
+                      </div>
+                      <div className="w-32 space-y-2">
+                        <Label>Tag  {index + 1}</Label>
+                        <Input
+                          placeholder="latest"
+                          value={image.tag}
+                          onChange={(e) => updateDockerImage(image.id, "tag", e.target.value)}
+                        />
+                      </div>
+                      {dockerImages.length > 1 && (
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => removeDockerImage(image.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+
+                  {dockerImages.length < 3 && (
+                    <Button
+                      variant="outline"
+                      onClick={addDockerImage}
+                      className="w-full border-dashed border-2 hover:bg-slate-50"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Agregar Imagen Docker
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Service-specific Configuration */}
             {renderServiceConfiguration()}
           </div>
