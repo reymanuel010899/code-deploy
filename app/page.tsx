@@ -45,6 +45,8 @@ interface DockerImage {
   name: string
   tag: string
   port: number
+  cpu: number
+  memory: number
 }
 
 interface EC2Config {
@@ -105,7 +107,14 @@ interface LambdaConfig {
 }
 
 export default function CloudInterface() {
-  const [dockerImages, setDockerImages] = useState<DockerImage[]>([{ id: "1", name: "", tag: "latest", port: 80 }])
+  const [dockerImages, setDockerImages] = useState<DockerImage[]>([{
+    id: "1",
+    name: "",
+    tag: "latest",
+    port: 80,
+    cpu: 128,
+    memory: 128,
+  }])
   const [selectedService, setSelectedService] = useState<string>("ec2")
   const [selectedRegions, setSelectedRegions] = useState<string[]>(["us-east-1"])
   const [currentRegionIndex, setCurrentRegionIndex] = useState(0)
@@ -166,14 +175,36 @@ export default function CloudInterface() {
 
   const [isDeploying, setIsDeploying] = useState(false)
 
+  // Estado para las credenciales de base de datos
+  const [databaseCredentials, setDatabaseCredentials] = useState({
+    rootPassword: "",
+    databaseName: "",
+    databaseUser: "",
+    databasePassword: "",
+    mysqlPort: "3306",
+  })
+
+  // Helper functions for available CPU/Memory options for Docker images
+  const ECS_CPU_OPTIONS = [128, 256, 512, 1024, 2048, 4096]
+  const ECS_MEMORY_OPTIONS = [128, 256, 512, 1024, 2048, 4096, 8192]
+
+  function getAvailableCpuOptions(imageId: string) {
+    const totalOtherCpu = dockerImages.filter(img => img.id !== imageId).reduce((sum, img) => sum + (Number(img.cpu) || 0), 0)
+    return ECS_CPU_OPTIONS.filter(opt => opt + totalOtherCpu <= ecsConfig.taskCpu)
+  }
+  function getAvailableMemoryOptions(imageId: string) {
+    const totalOtherMemory = dockerImages.filter(img => img.id !== imageId).reduce((sum, img) => sum + (Number(img.memory) || 0), 0)
+    return ECS_MEMORY_OPTIONS.filter(opt => opt + totalOtherMemory <= ecsConfig.taskMemory)
+  }
+
   const addDockerImage = () => {
     if (dockerImages.length < 3) {
       dockerImages.forEach(async (img) => {
         if (img.name.trim()) {
           try {
-        await createDockerImages({ "name": img.name, "tag": img.tag })
+            await createDockerImages({ "name": img.name, "tag": img.tag })
           } catch (error) {
-        console.error("Error creando imagen Docker:", error)
+            console.error("Error creando imagen Docker:", error)
           }
         }
       })
@@ -184,12 +215,10 @@ export default function CloudInterface() {
           name: "",
           tag: "latest",
           port: 80,
+          cpu: 128,
+          memory: 128,
         },
       ])
-  
-      // createDockerImages(dockerImages)
-      
-
     }
   }
 
@@ -199,7 +228,7 @@ export default function CloudInterface() {
     }
   }
 
-  const updateDockerImage = (id: string, field: string, value: string) => {
+  const updateDockerImage = (id: string, field: string, value: string | number) => {
     setDockerImages(dockerImages.map((img) => (img.id === id ? { ...img, [field]: value } : img)))
   }
 
@@ -247,22 +276,22 @@ export default function CloudInterface() {
   const services = [
     {
       id: "ec2",
-      name: "EC2 Instance",
-      description: "Servidor virtual escalable",
+      name: "CloudBeast",
+      description: "Potencia bruta en la nube",
       icon: Server,
       color: "bg-orange-500",
     },
     {
       id: "ecs",
-      name: "ECS Container",
-      description: "Contenedores administrados",
+      name: "SkyBox",
+      description: "Tu app, lista para despegar",
       icon: Container,
       color: "bg-blue-500",
     },
     {
       id: "lambda",
-      name: "Lambda Function",
-      description: "Funciones sin servidor",
+      name: "Zaplet",
+      description: "Ejecución instantánea en la nube",
       icon: Cloud,
       color: "bg-green-500",
     },
@@ -555,7 +584,7 @@ export default function CloudInterface() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Container className="h-5 w-5" />
-                Configuración ECS
+                Configuración SkyBox
               </CardTitle>
               <CardDescription>Configura tu servicio de contenedores administrado</CardDescription>
             </CardHeader>
@@ -648,6 +677,175 @@ export default function CloudInterface() {
                       </Select>
                     </div>
                   </div>
+                  <Card className="mt-6">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Container className="h-5 w-5" />
+                        Imágenes Docker
+                      </CardTitle>
+                      <CardDescription>Configura hasta 3 imágenes Docker para tu aplicación. Asigna CPU y Memoria a cada contenedor.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {dockerImages.map((image, index) => (
+                        <div key={image.id} className="flex gap-3 items-end flex-wrap">
+                          <div className="flex-1 min-w-[120px] space-y-2">
+                            <Label>Imagen {index + 1}</Label>
+                            <Input
+                              placeholder="nginx, node:18, postgres:15"
+                              value={image.name}
+                              onChange={(e) => updateDockerImage(image.id, "name", e.target.value)}
+                            />
+                          </div>
+                          <div className="flex-1 min-w-[80px] space-y-2">
+                            <Label>Puerto</Label>
+                            <Input
+                              placeholder="443, 80, 5432"
+                              type="number"
+                              value={image.port}
+                              onChange={(e) => updateDockerImage(image.id, "port", Number(e.target.value))}
+                            />
+                          </div>
+                          <div className="w-32 min-w-[80px] space-y-2">
+                            <Label>Tag</Label>
+                            <Input
+                              placeholder="latest"
+                              value={image.tag}
+                              onChange={(e) => updateDockerImage(image.id, "tag", e.target.value)}
+                            />
+                          </div>
+                          <div className="w-32 min-w-[80px] space-y-2">
+                            <Label>CPU (units)</Label>
+                            <Select
+                              value={image.cpu.toString()}
+                              onValueChange={value => updateDockerImage(image.id, "cpu", Number(value))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ECS_CPU_OPTIONS.map(opt => (
+                                  <SelectItem key={opt} value={opt.toString()}>
+                                    {opt} {opt < 1024 ? `(0.${opt/1024} vCPU)` : `(${opt/1024} vCPU)`}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="w-32 min-w-[80px] space-y-2">
+                            <Label>Memoria (MB)</Label>
+                            <Select
+                              value={image.memory.toString()}
+                              onValueChange={value => updateDockerImage(image.id, "memory", Number(value))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ECS_MEMORY_OPTIONS.map(opt => (
+                                  <SelectItem key={opt} value={opt.toString()}>
+                                    {opt} MB
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {dockerImages.length > 1 && (
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={() => removeDockerImage(image.id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                      {dockerImages.length < 3 && (
+                        <Button
+                          variant="outline"
+                          onClick={addDockerImage}
+                          className="w-full border-dashed border-2 hover:bg-slate-50"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Agregar Imagen Docker
+                        </Button>
+                      )}
+
+                      {/* Nueva sección: Credenciales de Base de Datos */}
+                      <div className="mt-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                        <h4 className="font-medium mb-4 flex items-center gap-2">
+                          <Database className="h-5 w-5" />
+                          Credenciales de Base de Datos
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="mysql-root-password">ROOT_PASSWORD</Label>
+                            <Input
+                              id="mysql-root-password"
+                              placeholder="tu-password-segura"
+                              type="password"
+                              value={databaseCredentials.rootPassword}
+                              onChange={(e) => setDatabaseCredentials({...databaseCredentials, rootPassword: e.target.value})}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="mysql-database">DATABASE_NAME</Label>
+                            <Input
+                              id="mysql-database"
+                              placeholder="basededatos"
+                              value={databaseCredentials.databaseName}
+                              onChange={(e) => setDatabaseCredentials({...databaseCredentials, databaseName: e.target.value})}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="mysql-user">DATABASE_USER</Label>
+                            <Input
+                              id="mysql-user"
+                              placeholder="usuario"
+                              value={databaseCredentials.databaseUser}
+                              onChange={(e) => setDatabaseCredentials({...databaseCredentials, databaseUser: e.target.value})}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="mysql-password">DATABASE_PASSWORD</Label>
+                            <Input
+                              id="mysql-password"
+                              placeholder="password-del-usuario"
+                              type="password"
+                              value={databaseCredentials.databasePassword}
+                              onChange={(e) => setDatabaseCredentials({...databaseCredentials, databasePassword: e.target.value})}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="mysql-port">MYSQL_PORT</Label>
+                            <Input
+                              id="mysql-port"
+                              placeholder="3306"
+                              type="number"
+                              value={databaseCredentials.mysqlPort}
+                              onChange={(e) => setDatabaseCredentials({...databaseCredentials, mysqlPort: e.target.value})}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {(() => {
+                        const totalCpu = dockerImages.reduce((sum, img) => sum + (Number(img.cpu) || 0), 0)
+                        const totalMemory = dockerImages.reduce((sum, img) => sum + (Number(img.memory) || 0), 0)
+                        if (totalCpu > ecsConfig.taskCpu || totalMemory > ecsConfig.taskMemory) {
+                          return (
+                            <div className="text-red-600 text-sm font-medium mt-2">
+                              La suma de CPU o Memoria de los contenedores excede el límite definido en Task Definition.<br />
+                              CPU total: {totalCpu} / {ecsConfig.taskCpu} | Memoria total: {totalMemory} / {ecsConfig.taskMemory}<br />
+                              <span className="font-semibold">Para agregar más recursos, aumenta el límite de CPU o Memoria en la sección Task Definition.</span>
+                            </div>
+                          )
+                        }
+                        return null
+                      })()}
+                    </CardContent>
+                  </Card>
                 </TabsContent>
 
                 <TabsContent value="service" className="space-y-6 mt-6">
@@ -1078,10 +1276,35 @@ export default function CloudInterface() {
     return awsRegions.slice(startIndex, startIndex + 2)
   }
 
+  // Función para ordenar las imágenes Docker
+  function ordenarDockerImages(images: DockerImage[]) {
+    // Define palabras clave para cada tipo
+    const esServidorWeb = (name: string) =>
+      /nginx|apache|caddy|httpd/i.test(name);
+    const esBaseDeDatos = (name: string) =>
+      /mysql|postgres|mariadb|mongo|redis|db/i.test(name);
+    // La app web será la que no sea ni servidor web ni base de datos
+
+    let servidorWeb: DockerImage | undefined;
+    let appWeb: DockerImage | undefined;
+    let baseDeDatos: DockerImage | undefined;
+
+    images.forEach(img => {
+      if (esServidorWeb(img.name)) servidorWeb = img;
+      else if (esBaseDeDatos(img.name)) baseDeDatos = img;
+      else appWeb = img;
+    });
+
+    // Devuelve el array en el orden: [servidorWeb, appWeb, baseDeDatos]
+    return [servidorWeb, appWeb, baseDeDatos].filter(Boolean) as DockerImage[];
+  }
+
   const handleDeploy = async () => {
     setIsDeploying(true)
     
     try {
+      // Ordenar las imágenes antes de enviarlas
+      const dockerImagesOrdenadas = ordenarDockerImages(dockerImages);
       // Preparar los datos del deployment según el formato que espera el backend
       let deploymentData: any = {
         service: selectedService as "ec2" | "ecs" | "lambda",
@@ -1092,8 +1315,18 @@ export default function CloudInterface() {
       switch (selectedService) {
         case "ecs":
           deploymentData = {
-            ecs_config: ecsConfig,
-            docker_images: dockerImages,
+            ecs_config: {
+              ...ecsConfig,
+              environmentVariables: [
+                ...ecsConfig.environmentVariables,
+                { name: "MYSQL_ROOT_PASSWORD", value: databaseCredentials.rootPassword },
+                { name: "MYSQL_DATABASE", value: databaseCredentials.databaseName },
+                { name: "MYSQL_USER", value: databaseCredentials.databaseUser },
+                { name: "MYSQL_PASSWORD", value: databaseCredentials.databasePassword },
+                { name: "MYSQL_PORT", value: databaseCredentials.mysqlPort },
+              ].filter(env => env.value.trim() !== "") // Solo incluir variables con valor
+            },
+            docker_images: dockerImagesOrdenadas,
             service: "ecs",
           }
           break
@@ -1102,7 +1335,7 @@ export default function CloudInterface() {
           deploymentData = {
             ...deploymentData,
             name: `ec2-${Date.now()}`,
-            docker_image: dockerImages.filter((img) => img.name.trim()).map(img => `${img.name}:${img.tag}`).join(','),
+            docker_image: dockerImagesOrdenadas.filter((img) => img.name.trim()).map(img => `${img.name}:${img.tag}`).join(','),
             os: ec2Config.os,
             instance_type: ec2Config.instanceType,
             key_pair: ec2Config.keyPair,
@@ -1177,7 +1410,7 @@ export default function CloudInterface() {
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold text-slate-800 flex items-center justify-center gap-3">
             <Cloud className="h-10 w-10 text-blue-600" />
-            CloudDeploy
+             Cloud  Deployer
           </h1>
           <p className="text-slate-600 text-lg">Despliega tus aplicaciones Docker en la nube de forma sencilla</p>
         </div>
@@ -1223,70 +1456,6 @@ export default function CloudInterface() {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Docker Images Configuration - Only show for EC2 and ECS */}
-            {(selectedService === "ec2" || selectedService === "ecs") && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Container className="h-5 w-5" />
-                    Imágenes Docker
-                  </CardTitle>
-                  <CardDescription>Configura hasta 3 imágenes Docker para tu aplicación</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {dockerImages.map((image, index) => (
-                    <div key={image.id} className="flex gap-3 items-end">
-                      <div className="flex-1 space-y-2">
-                        <Label>Imagen {index + 1}</Label>
-                        <Input
-                          placeholder="nginx, node:18, postgres:15"
-                          value={image.name}
-                          onChange={(e) => updateDockerImage(image.id, "name", e.target.value)}
-                        />
-                      </div>
-                      <div className="flex-1 space-y-2">
-                        <Label>Imagen {index + 1}</Label>
-                        <Input
-                          placeholder="443, 80, 5432"
-                          value={image.port}
-                          onChange={(e) => updateDockerImage(image.id, "port", e.target.value)}
-                        />
-                      </div>
-                      <div className="w-32 space-y-2">
-                        <Label>Tag</Label>
-                        <Input
-                          placeholder="latest"
-                          value={image.tag}
-                          onChange={(e) => updateDockerImage(image.id, "tag", e.target.value)}
-                        />
-                      </div>
-                      {dockerImages.length > 1 && (
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => removeDockerImage(image.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  ))}
-
-                  {dockerImages.length < 3 && (
-                    <Button
-                      variant="outline"
-                      onClick={addDockerImage}
-                      className="w-full border-dashed border-2 hover:bg-slate-50"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Agregar Imagen Docker
-                    </Button>
-                  )}
-                </CardContent>
-              </Card>
-            )}
 
             {/* Service-specific Configuration */}
             {renderServiceConfiguration()}
@@ -1521,9 +1690,10 @@ export default function CloudInterface() {
                     (selectedService === "ec2" && !ec2Config.keyPair) ||
                     (selectedService === "ecs" && !ecsConfig.clusterName) ||
                     (selectedService === "lambda" && !lambdaConfig.handler) ||
-                    ((selectedService === "ec2" || selectedService === "ecs") && !dockerImages.some((img) => img.name))
+                    ((selectedService === "ec2" || selectedService === "ecs") && !dockerImages.some((img) => img.name)) ||
+                    (selectedService === "ecs" && (dockerImages.reduce((sum, img) => sum + (Number(img.cpu) || 0), 0) > ecsConfig.taskCpu || dockerImages.reduce((sum, img) => sum + (Number(img.memory) || 0), 0) > ecsConfig.taskMemory))
                   }
-                  onClick={handleDeploy}
+                  onClick={() => handleDeploy()}
                 >
                   {isDeploying ? (
                     <>

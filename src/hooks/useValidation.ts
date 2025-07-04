@@ -54,6 +54,15 @@ export const useValidation = () => {
         if (ecsConfig.containerPort <= 0 || ecsConfig.containerPort > 65535) {
           errors.push("El puerto del contenedor debe estar entre 1 y 65535")
         }
+        // Validación de suma de recursos
+        const totalCpu = dockerImages.reduce((sum, img) => sum + (parseInt(img.cpu || "0", 10) || 0), 0)
+        const totalMemory = dockerImages.reduce((sum, img) => sum + (parseInt(img.memory || "0", 10) || 0), 0)
+        if (totalCpu > ecsConfig.taskCpu) {
+          errors.push(`La suma de CPU de los contenedores (${totalCpu}) excede el límite de la tarea (${ecsConfig.taskCpu})`)
+        }
+        if (totalMemory > ecsConfig.taskMemory) {
+          errors.push(`La suma de memoria de los contenedores (${totalMemory}) excede el límite de la tarea (${ecsConfig.taskMemory})`)
+        }
         break
 
       case "lambda":

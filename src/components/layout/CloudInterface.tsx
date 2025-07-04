@@ -30,7 +30,7 @@ export function CloudInterface() {
 
           <h1 className="text-4xl font-bold text-foreground flex items-center justify-center gap-3 animate-fade-in">
             <Cloud className="h-10 w-10 text-primary" />
-            CloudDeploy Pro
+            Deployer
           </h1>
           <p className="text-muted-foreground text-lg">
             Despliega tus aplicaciones Docker en la nube de forma sencilla
@@ -41,8 +41,6 @@ export function CloudInterface() {
           {/* Main Configuration */}
           <div className="lg:col-span-2 space-y-6">
             <ServiceSelector />
-
-            {(service === "ec2" || service === "ecs") && <DockerImagesConfig />}
 
             <ServiceConfiguration />
 

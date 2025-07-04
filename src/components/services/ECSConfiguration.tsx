@@ -57,14 +57,16 @@ export function ECSConfiguration() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Container className="h-5 w-5" />
-          Configuración ECS Fargate
+          Configuración SkyBox Fargate
         </CardTitle>
         <CardDescription>Configura tu servicio de contenedores serverless con Fargate</CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="basic">Básico</TabsTrigger>
+            <TabsTrigger value="taskdef">Task Definition</TabsTrigger>
+            <TabsTrigger value="images">Imágenes</TabsTrigger>
             <TabsTrigger value="container">Contenedor</TabsTrigger>
             <TabsTrigger value="network">Red</TabsTrigger>
             <TabsTrigger value="environment">Variables</TabsTrigger>
@@ -102,6 +104,25 @@ export function ECSConfiguration() {
               <p className="text-xs text-muted-foreground">Nombre de la familia de definición de tareas</p>
             </div>
 
+            <div className="space-y-2">
+              <Label>Versión de Plataforma Fargate</Label>
+              <Select
+                value={ecsConfig.platformVersion}
+                onValueChange={(value) => setECSConfig({ platformVersion: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="LATEST">LATEST (Recomendado)</SelectItem>
+                  <SelectItem value="1.4.0">1.4.0</SelectItem>
+                  <SelectItem value="1.3.0">1.3.0</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="taskdef" className="space-y-6 mt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-3">
                 <div className="flex justify-between">
@@ -155,22 +176,79 @@ export function ECSConfiguration() {
                 </Select>
               </div>
             </div>
+          </TabsContent>
 
-            <div className="space-y-2">
-              <Label>Versión de Plataforma Fargate</Label>
-              <Select
-                value={ecsConfig.platformVersion}
-                onValueChange={(value) => setECSConfig({ platformVersion: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="LATEST">LATEST (Recomendado)</SelectItem>
-                  <SelectItem value="1.4.0">1.4.0</SelectItem>
-                  <SelectItem value="1.3.0">1.3.0</SelectItem>
-                </SelectContent>
-              </Select>
+          <TabsContent value="images" className="space-y-6 mt-6">
+            <div className="my-6">
+              <h4 className="font-medium flex items-center gap-2">
+                <Container className="h-5 w-5" />
+                Imágenes Docker
+              </h4>
+              <p className="text-muted-foreground mb-2">Configura hasta 3 imágenes Docker para tu tarea ECS. Especifica el puerto, CPU y memoria de cada contenedor.</p>
+              {useDeploymentStore.getState().dockerImages.map((image, index) => (
+                <div key={image.id} className="flex gap-3 items-end mb-2">
+                  <div className="flex-1 space-y-2">
+                    <Label>Imagen {index + 1}</Label>
+                    <Input
+                      placeholder="nginx, node:18, postgres:15"
+                      value={image.name}
+                      onChange={(e) => useDeploymentStore.getState().updateDockerImage(image.id, "name", e.target.value)}
+                    />
+                  </div>
+                  <div className="w-24 space-y-2">
+                    <Label>Tag</Label>
+                    <Input
+                      placeholder="latest"
+                      value={image.tag}
+                      onChange={(e) => useDeploymentStore.getState().updateDockerImage(image.id, "tag", e.target.value)}
+                    />
+                  </div>
+                  <div className="w-24 space-y-2">
+                    <Label>Puerto</Label>
+                    <Input
+                      placeholder="80"
+                      value={image.port || ""}
+                      onChange={(e) => useDeploymentStore.getState().updateDockerImage(image.id, "port", e.target.value)}
+                    />
+                  </div>
+                  <div className="w-24 space-y-2">
+                    <Label>CPU</Label>
+                    <Input
+                      placeholder="256"
+                      value={image.cpu || ""}
+                      onChange={(e) => useDeploymentStore.getState().updateDockerImage(image.id, "cpu", e.target.value)}
+                    />
+                  </div>
+                  <div className="w-24 space-y-2">
+                    <Label>Memoria</Label>
+                    <Input
+                      placeholder="512"
+                      value={image.memory || ""}
+                      onChange={(e) => useDeploymentStore.getState().updateDockerImage(image.id, "memory", e.target.value)}
+                    />
+                  </div>
+                  {useDeploymentStore.getState().dockerImages.length > 1 && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => useDeploymentStore.getState().removeDockerImage(image.id)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              {useDeploymentStore.getState().dockerImages.length < 3 && (
+                <Button
+                  variant="outline"
+                  onClick={() => useDeploymentStore.getState().addDockerImage()}
+                  className="w-full border-dashed border-2 hover:bg-muted/50"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Agregar Imagen Docker
+                </Button>
+              )}
             </div>
           </TabsContent>
 

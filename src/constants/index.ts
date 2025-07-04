@@ -4,22 +4,22 @@ import type { Service, AWSRegion } from "@/types"
 export const SERVICES: Service[] = [
   {
     id: "ec2",
-    name: "EC2 Instance",
-    description: "Servidor virtual escalable",
+    name: "CloudBeast",
+    description: "Potencia bruta en la nube",
     icon: Server,
     color: "bg-orange-500",
   },
   {
     id: "ecs",
-    name: "ECS Container",
-    description: "Contenedores administrados",
+    name: "SkyBox",
+    description: "Tu app, lista para despegar",
     icon: Container,
     color: "bg-blue-500",
   },
   {
     id: "lambda",
-    name: "Lambda Function",
-    description: "Funciones sin servidor",
+    name: "Zaplet",
+    description: "Ejecución instantánea en la nube",
     icon: Cloud,
     color: "bg-green-500",
   },

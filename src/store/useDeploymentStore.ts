@@ -23,7 +23,7 @@ interface DeploymentStore extends DeploymentConfig {
 const initialState: DeploymentConfig = {
   service: "ec2",
   regions: ["us-east-1"],
-  dockerImages: [{ id: "1", name: "", tag: "latest" }],
+  dockerImages: [{ id: "1", name: "", tag: "latest", port: "", cpu: "", memory: "" }],
   ec2Config: {
     os: "amazon-linux-2",
     instanceType: "t3.medium",
@@ -113,6 +113,9 @@ export const useDeploymentStore = create<DeploymentStore>()(
                   id: Date.now().toString(),
                   name: "",
                   tag: "latest",
+                  port: "",
+                  cpu: "",
+                  memory: "",
                 },
               ],
             }
