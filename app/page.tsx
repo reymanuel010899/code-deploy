@@ -828,6 +828,23 @@ export default function CloudInterface() {
                             />
                           </div>
                         </div>
+                        {/* Ejemplo de acceso a variables de entorno */}
+                        <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <h5 className="font-semibold mb-2 flex items-center gap-2 text-blue-900">
+                            <Code className="h-4 w-4" /> Ejemplo de acceso a las variables de entorno en Python
+                          </h5>
+                          <p className="text-sm text-blue-800 mb-2">Puedes acceder a las credenciales de tu base de datos usando variables de entorno de la siguiente manera:</p>
+                          <pre className="bg-blue-100 text-blue-900 rounded-md p-3 text-xs overflow-x-auto">
+{`import os
+
+DB_ENGINE_TYPE = os.environ.get('DATABASE_ENGINE', 'MYSQL').upper()
+DB_HOST = os.environ.get(f'{DB_ENGINE_TYPE}_HOST', 'localhost')
+DB_PORT = os.environ.get(f'{DB_ENGINE_TYPE}_PORT')
+DB_NAME = os.environ.get(f'{DB_ENGINE_TYPE}_DATABASE')
+DB_USER = os.environ.get(f'{DB_ENGINE_TYPE}_USER')
+DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
+                          </pre>
+                        </div>
                       </div>
 
                       {(() => {
@@ -1404,8 +1421,8 @@ export default function CloudInterface() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4">
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className="h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100">
+      <div className="w-full space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
           <h1 className="text-4xl font-bold text-slate-800 flex items-center justify-center gap-3">
