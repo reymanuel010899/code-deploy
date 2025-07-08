@@ -76,7 +76,7 @@ export function ECSConfiguration() {
           <TabsContent value="basic" className="space-y-6 mt-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Nombre del Cluster</Label>
+                <Label>Deployments Name</Label>
                 <Input
                   placeholder="mi-aplicacion-cluster"
                   value={ecsConfig.clusterName}

@@ -115,7 +115,7 @@ export default function CloudInterface() {
     cpu: 128,
     memory: 128,
   }])
-  const [selectedService, setSelectedService] = useState<string>("ec2")
+  const [selectedService, setSelectedService] = useState<string>("pagedrop")
   const [selectedRegions, setSelectedRegions] = useState<string[]>(["us-east-1"])
   const [currentRegionIndex, setCurrentRegionIndex] = useState(0)
 
@@ -184,9 +184,15 @@ export default function CloudInterface() {
     mysqlPort: "3306",
   })
 
+  const [isPrivateRegistry, setIsPrivateRegistry] = useState(false)
+  const [privateRegistryCredentials, setPrivateRegistryCredentials] = useState({
+    username: "",
+    password: ""
+  })
+
   // Helper functions for available CPU/Memory options for Docker images
-  const ECS_CPU_OPTIONS = [128, 256, 512, 1024, 2048, 4096]
-  const ECS_MEMORY_OPTIONS = [128, 256, 512, 1024, 2048, 4096, 8192]
+  const ECS_CPU_OPTIONS = [128, 256, 512, 1024, 2048, 4096, 8192, 16384]
+  const ECS_MEMORY_OPTIONS = [128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536]
 
   function getAvailableCpuOptions(imageId: string) {
     const totalOtherCpu = dockerImages.filter(img => img.id !== imageId).reduce((sum, img) => sum + (Number(img.cpu) || 0), 0)
@@ -275,11 +281,11 @@ export default function CloudInterface() {
 
   const services = [
     {
-      id: "ec2",
-      name: "CloudBeast",
-      description: "Potencia bruta en la nube",
+      id: "pagedrop",
+      name: "PageDrop",
+      description: "Despliega páginas web y landings en segundos",
       icon: Server,
-      color: "bg-orange-500",
+      color: "bg-pink-500",
     },
     {
       id: "ecs",
@@ -380,204 +386,60 @@ export default function CloudInterface() {
 
   const renderServiceConfiguration = () => {
     switch (selectedService) {
-      case "ec2":
+      case "pagedrop":
         return (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Server className="h-5 w-5" />
-                Configuración EC2
+                Configuración PageDrop
               </CardTitle>
-              <CardDescription>Configura tu instancia EC2 con todos los detalles necesarios</CardDescription>
+              <CardDescription>
+                Despliega tu landing page o sitio web estático en la nube de forma sencilla. Solo necesitas tu imagen Docker lista para servir tu app (por ejemplo, nginx, node, etc).
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="basic" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
-                  <TabsTrigger value="basic">Básico</TabsTrigger>
-                  <TabsTrigger value="network">Red & Seguridad</TabsTrigger>
-                  <TabsTrigger value="storage">Almacenamiento</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="basic" className="space-y-6 mt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Sistema Operativo</Label>
-                      <Select value={ec2Config.os} onValueChange={(value) => setEC2Config({ ...ec2Config, os: value })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {operatingSystems.map((os) => (
-                            <SelectItem key={os.value} value={os.value}>
-                              <div className="flex items-center gap-2">
-                                <span>{os.icon}</span>
-                                {os.label}
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Tipo de Instancia</Label>
-                      <Select
-                        value={ec2Config.instanceType}
-                        onValueChange={(value) => setEC2Config({ ...ec2Config, instanceType: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="t3.micro">t3.micro (1 vCPU, 1GB RAM) - $7.50/mes</SelectItem>
-                          <SelectItem value="t3.small">t3.small (1 vCPU, 2GB RAM) - $15.00/mes</SelectItem>
-                          <SelectItem value="t3.medium">t3.medium (2 vCPU, 4GB RAM) - $30.00/mes</SelectItem>
-                          <SelectItem value="t3.large">t3.large (2 vCPU, 8GB RAM) - $60.00/mes</SelectItem>
-                          <SelectItem value="t3.xlarge">t3.xlarge (4 vCPU, 16GB RAM) - $120.00/mes</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Key Pair (SSH)</Label>
-                    <Input
-                      placeholder="mi-key-pair"
-                      value={ec2Config.keyPair}
-                      onChange={(e) => setEC2Config({ ...ec2Config, keyPair: e.target.value })}
-                    />
-                    <p className="text-xs text-slate-500">Necesario para conectarte por SSH a tu instancia</p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>User Data Script (Opcional)</Label>
-                    <Textarea
-                      placeholder="#!/bin/bash&#10;yum update -y&#10;yum install -y docker&#10;service docker start"
-                      value={ec2Config.userData}
-                      onChange={(e) => setEC2Config({ ...ec2Config, userData: e.target.value })}
-                      rows={4}
-                    />
-                    <p className="text-xs text-slate-500">Script que se ejecutará al iniciar la instancia</p>
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      checked={ec2Config.monitoring}
-                      onCheckedChange={(checked) => setEC2Config({ ...ec2Config, monitoring: checked })}
-                    />
-                    <Label>Habilitar monitoreo detallado (+$2.10/mes)</Label>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="network" className="space-y-6 mt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Network className="h-4 w-4" />
-                        Subnet
-                      </Label>
-                      <Select
-                        value={ec2Config.subnet}
-                        onValueChange={(value) => setEC2Config({ ...ec2Config, subnet: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">Default Subnet</SelectItem>
-                          <SelectItem value="public-1a">Public Subnet 1a</SelectItem>
-                          <SelectItem value="private-1a">Private Subnet 1a</SelectItem>
-                          <SelectItem value="public-1b">Public Subnet 1b</SelectItem>
-                          <SelectItem value="private-1b">Private Subnet 1b</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <Shield className="h-4 w-4" />
-                        Security Group
-                      </Label>
-                      <Select
-                        value={ec2Config.securityGroup}
-                        onValueChange={(value) => setEC2Config({ ...ec2Config, securityGroup: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">Default (SSH + HTTP + HTTPS)</SelectItem>
-                          <SelectItem value="web-server">Web Server (80, 443)</SelectItem>
-                          <SelectItem value="database">Database (3306, 5432)</SelectItem>
-                          <SelectItem value="custom">Custom Security Group</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <h4 className="font-medium text-blue-900 mb-2">Puertos que se abrirán:</h4>
-                    <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline">SSH (22)</Badge>
-                      <Badge variant="outline">HTTP (80)</Badge>
-                      <Badge variant="outline">HTTPS (443)</Badge>
-                      {ec2Config.securityGroup === "database" && (
-                        <>
-                          <Badge variant="outline">MySQL (3306)</Badge>
-                          <Badge variant="outline">PostgreSQL (5432)</Badge>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="storage" className="space-y-6 mt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-2">
-                        <HardDrive className="h-4 w-4" />
-                        Tipo de Almacenamiento
-                      </Label>
-                      <Select
-                        value={ec2Config.storageType}
-                        onValueChange={(value) => setEC2Config({ ...ec2Config, storageType: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="gp3">GP3 - General Purpose SSD (Recomendado)</SelectItem>
-                          <SelectItem value="gp2">GP2 - General Purpose SSD</SelectItem>
-                          <SelectItem value="io2">IO2 - Provisioned IOPS SSD</SelectItem>
-                          <SelectItem value="st1">ST1 - Throughput Optimized HDD</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <Label>Tamaño del Disco (GB)</Label>
-                        <Badge variant="secondary">{ec2Config.storageSize} GB</Badge>
-                      </div>
-                      <Slider
-                        value={[ec2Config.storageSize]}
-                        onValueChange={(value) => setEC2Config({ ...ec2Config, storageSize: value[0] })}
-                        max={1000}
-                        min={8}
-                        step={1}
-                        className="w-full"
-                      />
-                      <p className="text-xs text-slate-500">
-                        Costo adicional: ${(ec2Config.storageSize * 0.1).toFixed(2)}/mes
-                      </p>
-                    </div>
-                  </div>
-                </TabsContent>
-              </Tabs>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <Label>Imagen Docker</Label>
+                  <Input
+                    placeholder="nginx, tu-app:latest, mi-landing"
+                    value={dockerImages[0].name}
+                    onChange={e => updateDockerImage(dockerImages[0].id, "name", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tag</Label>
+                  <Input
+                    placeholder="latest"
+                    value={dockerImages[0].tag}
+                    onChange={e => updateDockerImage(dockerImages[0].id, "tag", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Puerto de la App</Label>
+                  <Input
+                    placeholder="80"
+                    type="number"
+                    value={dockerImages[0].port}
+                    onChange={e => updateDockerImage(dockerImages[0].id, "port", Number(e.target.value))}
+                  />
+                  <p className="text-xs text-slate-500">El puerto que expone tu contenedor (por ejemplo, 80 para nginx o 3000 para apps Node.js)</p>
+                </div>
+                <div className="mt-6 p-4 bg-pink-50 rounded-lg border border-pink-200">
+                  <h4 className="font-medium mb-2 text-pink-900 flex items-center gap-2">
+                    <Server className="h-4 w-4" /> ¿Cómo funciona?
+                  </h4>
+                  <ul className="list-disc pl-6 text-pink-800 text-sm space-y-1">
+                    <li>Solo necesitas una imagen Docker que sirva tu página web o landing.</li>
+                    <li>El sistema desplegará tu contenedor en la nube y te dará una URL pública.</li>
+                    <li>No necesitas configurar recursos, solo enfócate en tu contenido.</li>
+                  </ul>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )
-
       case "ecs":
         return (
           <Card>
@@ -600,7 +462,7 @@ export default function CloudInterface() {
                 <TabsContent value="cluster" className="space-y-6 mt-6">
                   <div className="space-y-4">
                     <div className="space-y-2">
-                      <Label>Nombre del Cluster</Label>
+                      <Label>Deployment Name</Label>
                       <Input
                         placeholder="mi-aplicacion-cluster"
                         value={ecsConfig.clusterName}
@@ -632,47 +494,52 @@ export default function CloudInterface() {
                 </TabsContent>
 
                 <TabsContent value="task" className="space-y-6 mt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <Label>CPU (vCPU)</Label>
-                        <Badge variant="secondary">{ecsConfig.taskCpu}</Badge>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <Label className="text-2xl font-bold">CPU (vCPU)</Label>
+                        <Badge variant="secondary" className="text-lg px-4 py-2">{ecsConfig.taskCpu}</Badge>
                       </div>
                       <Select
                         value={ecsConfig.taskCpu.toString()}
                         onValueChange={(value) => setECSConfig({ ...ecsConfig, taskCpu: Number.parseInt(value) })}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-14 text-xl font-semibold border-2 border-blue-300 rounded-xl">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="text-lg">
                           <SelectItem value="256">0.25 vCPU (256)</SelectItem>
                           <SelectItem value="512">0.5 vCPU (512)</SelectItem>
                           <SelectItem value="1024">1 vCPU (1024)</SelectItem>
                           <SelectItem value="2048">2 vCPU (2048)</SelectItem>
                           <SelectItem value="4096">4 vCPU (4096)</SelectItem>
+                          <SelectItem value="8192">8 vCPU (8192)</SelectItem>
+                          <SelectItem value="16384">16 vCPU (16384)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
-                    <div className="space-y-3">
-                      <div className="flex justify-between">
-                        <Label>Memoria (MB)</Label>
-                        <Badge variant="secondary">{ecsConfig.taskMemory} MB</Badge>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center">
+                        <Label className="text-2xl font-bold">Memoria (MB)</Label>
+                        <Badge variant="secondary" className="text-lg px-4 py-2">{ecsConfig.taskMemory} MB</Badge>
                       </div>
                       <Select
                         value={ecsConfig.taskMemory.toString()}
                         onValueChange={(value) => setECSConfig({ ...ecsConfig, taskMemory: Number.parseInt(value) })}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="h-14 text-xl font-semibold border-2 border-blue-300 rounded-xl">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="text-lg">
                           <SelectItem value="512">512 MB</SelectItem>
                           <SelectItem value="1024">1 GB (1024 MB)</SelectItem>
                           <SelectItem value="2048">2 GB (2048 MB)</SelectItem>
                           <SelectItem value="4096">4 GB (4096 MB)</SelectItem>
                           <SelectItem value="8192">8 GB (8192 MB)</SelectItem>
+                          <SelectItem value="16384">16 GB (16384 MB)</SelectItem>
+                          <SelectItem value="32768">32 GB (32768 MB)</SelectItem>
+                          <SelectItem value="65536">64 GB (65536 MB)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -681,11 +548,52 @@ export default function CloudInterface() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Container className="h-5 w-5" />
-                        Imágenes Docker
+                        Sube Tus Imágenes de Cualquier Repositorio o Proveedor de Contenedores
                       </CardTitle>
                       <CardDescription>Configura hasta 3 imágenes Docker para tu aplicación. Asigna CPU y Memoria a cada contenedor.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                      {/* Switch para contenedores privados/públicos */}
+                      <div className="flex items-center gap-3 mb-2">
+                        <Switch
+                          checked={isPrivateRegistry}
+                          onCheckedChange={setIsPrivateRegistry}
+                          id="private-registry-switch"
+                        />
+                        <Label htmlFor="private-registry-switch" className="font-medium">
+                          ¿Tus contenedores son privados?
+                        </Label>
+                        <span className="text-xs text-slate-500">(Docker Hub, GitHub Packages, ECR, etc)</span>
+                      </div>
+                      {isPrivateRegistry && (
+                        <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <div className="mb-2 text-blue-900 font-semibold text-sm">
+                            Ingresa las credenciales de tu repositorio privado. <br />
+                            <span className="font-normal">Estas credenciales estarán <span className="font-bold">cifradas</span> y seguras con token de acceso temporales, solo se usarán para autenticar la descarga de tus imágenes.</span>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="private-username">Usuario</Label>
+                              <Input
+                                id="private-username"
+                                placeholder="username"
+                                value={privateRegistryCredentials.username}
+                                onChange={e => setPrivateRegistryCredentials({ ...privateRegistryCredentials, username: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="private-password">Contraseña</Label>
+                              <Input
+                                id="private-password"
+                                placeholder="password"
+                                type="password"
+                                value={privateRegistryCredentials.password}
+                                onChange={e => setPrivateRegistryCredentials({ ...privateRegistryCredentials, password: e.target.value })}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                       {dockerImages.map((image, index) => (
                         <div key={image.id} className="flex gap-3 items-end flex-wrap">
                           <div className="flex-1 min-w-[120px] space-y-2">
@@ -829,12 +737,12 @@ export default function CloudInterface() {
                           </div>
                         </div>
                         {/* Ejemplo de acceso a variables de entorno */}
-                        <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                          <h5 className="font-semibold mb-2 flex items-center gap-2 text-blue-900">
-                            <Code className="h-4 w-4" /> Ejemplo de acceso a las variables de entorno en Python
+                        <div className="mt-8 p-6 bg-gradient-to-br from-blue-100 to-blue-50 rounded-2xl border border-blue-200 shadow-md">
+                          <h5 className="font-bold mb-3 flex items-center gap-2 text-blue-900 text-xl">
+                            <Code className="h-6 w-6" /> Ejemplo de acceso a las variables de entorno en Python
                           </h5>
-                          <p className="text-sm text-blue-800 mb-2">Puedes acceder a las credenciales de tu base de datos usando variables de entorno de la siguiente manera:</p>
-                          <pre className="bg-blue-100 text-blue-900 rounded-md p-3 text-xs overflow-x-auto">
+                          <p className="text-base text-blue-800 mb-3">Puedes acceder a las credenciales de tu base de datos usando variables de entorno de la siguiente manera:</p>
+                          <pre className="bg-blue-200 text-blue-900 rounded-lg p-4 text-base font-mono overflow-x-auto shadow-inner">
 {`import os
 
 DB_ENGINE_TYPE = os.environ.get('DATABASE_ENGINE', 'MYSQL').upper()
@@ -1324,7 +1232,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
       const dockerImagesOrdenadas = ordenarDockerImages(dockerImages);
       // Preparar los datos del deployment según el formato que espera el backend
       let deploymentData: any = {
-        service: selectedService as "ec2" | "ecs" | "lambda",
+        service: selectedService as "pagedrop" | "ecs" | "lambda",
         regions: selectedRegions,
       }
 
@@ -1334,6 +1242,8 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
           deploymentData = {
             ecs_config: {
               ...ecsConfig,
+              isRepoPrivate: isPrivateRegistry,
+              privateRegistryCredentials: isPrivateRegistry ? privateRegistryCredentials : undefined,
               environmentVariables: [
                 ...ecsConfig.environmentVariables,
                 { name: "MYSQL_ROOT_PASSWORD", value: databaseCredentials.rootPassword },
@@ -1348,20 +1258,12 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
           }
           break
 
-        case "ec2":
+        case "pagedrop":
           deploymentData = {
             ...deploymentData,
-            name: `ec2-${Date.now()}`,
-            docker_image: dockerImagesOrdenadas.filter((img) => img.name.trim()).map(img => `${img.name}:${img.tag}`).join(','),
-            os: ec2Config.os,
-            instance_type: ec2Config.instanceType,
-            key_pair: ec2Config.keyPair,
-            security_group: ec2Config.securityGroup,
-            subnet: ec2Config.subnet,
-            storage_type: ec2Config.storageType,
-            storage_size: ec2Config.storageSize,
-            user_data: ec2Config.userData,
-            monitoring: ec2Config.monitoring,
+            name: `pagedrop-${Date.now()}`,
+            docker_image: `${dockerImages[0].name}:${dockerImages[0].tag}`,
+            port: dockerImages[0].port,
           }
           break
 
@@ -1421,15 +1323,14 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
   }
 
   return (
-    <div className="h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100">
-      <div className="w-full space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-bold text-slate-800 flex items-center justify-center gap-3">
-            <Cloud className="h-10 w-10 text-blue-600" />
-             Cloud  Deployer
+    <div className="h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+      <div className="h-[90vh] w-[90vw] mx-auto my-auto rounded-2xl shadow-2xl bg-white/80 p-10 space-y-8 overflow-auto" style={{fontSize: '1.15rem', fontFamily: 'Inter, sans-serif'}}>
+        <div className="text-center space-y-3">
+          <h1 className="text-6xl font-extrabold text-slate-800 flex items-center justify-center gap-4 tracking-tight drop-shadow-lg">
+            <Cloud className="h-14 w-14 text-blue-600" />
+            Cloud Deployer
           </h1>
-          <p className="text-slate-600 text-lg">Despliega tus aplicaciones Docker en la nube de forma sencilla</p>
+          <p className="text-slate-700 text-2xl font-medium">Despliega tus aplicaciones Docker en la nube de forma sencilla</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1485,7 +1386,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Globe className="h-5 w-5" />
-                  Regiones AWS
+                  Regiones
                 </CardTitle>
                 <CardDescription>Selecciona las regiones donde desplegar</CardDescription>
               </CardHeader>
