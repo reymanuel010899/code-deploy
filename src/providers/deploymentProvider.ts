@@ -257,4 +257,20 @@ export class DeploymentProvider {
   static async cancelDeployment(deploymentId: number): Promise<{ success: boolean; message: string }> {
     return this.deleteDeployment(deploymentId)
   }
+
+  /**
+   * GET @http://127.0.0.1:8000/api/deployments/ - Listar deployments desde API local
+   */
+  static async fetchDeploymentsFromLocalApi(): Promise<any[]> {
+    try {
+      const response = await fetch("http://127.0.0.1:8000/api/deployments/")
+      if (!response.ok) throw new Error("Error al obtener deployments desde API local")
+      const data = await response.json()
+      console.log(data)
+      return data
+    } catch (error) {
+      console.error("Error fetching deployments from local API:", error)
+      throw error
+    }
+  }
 }

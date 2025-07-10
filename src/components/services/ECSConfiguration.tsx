@@ -12,9 +12,13 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Container, Plus, Trash2, Network, Shield, Activity, Settings } from "lucide-react"
 import { useDeploymentStore } from "@/store/useDeploymentStore"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "components/ui/dialog"
+import { useState } from "react"
 
 export function ECSConfiguration() {
   const { ecsConfig, setECSConfig } = useDeploymentStore()
+  const [modalImageId, setModalImageId] = useState<string | null>(null)
+  const [modalType, setModalType] = useState<"update" | "replace" | null>(null)
 
   const addEnvironmentVariable = () => {
     setECSConfig({
@@ -186,45 +190,57 @@ export function ECSConfiguration() {
               </h4>
               <p className="text-muted-foreground mb-2">Configura hasta 3 imágenes Docker para tu tarea ECS. Especifica el puerto, CPU y memoria de cada contenedor.</p>
               {useDeploymentStore.getState().dockerImages.map((image, index) => (
-                <div key={image.id} className="flex gap-3 items-end mb-2">
-                  <div className="flex-1 space-y-2">
+                <div key={image.id} className="flex gap-2 items-end mb-2 flex-wrap">
+                  <div className="flex-1 min-w-[120px] space-y-2">
                     <Label>Imagen {index + 1}</Label>
                     <Input
+                      className="h-9 text-sm"
                       placeholder="nginx, node:18, postgres:15"
                       value={image.name}
                       onChange={(e) => useDeploymentStore.getState().updateDockerImage(image.id, "name", e.target.value)}
                     />
                   </div>
-                  <div className="w-24 space-y-2">
+                  <div className="w-20 min-w-[80px] space-y-2">
                     <Label>Tag</Label>
                     <Input
+                      className="h-9 text-sm"
                       placeholder="latest"
                       value={image.tag}
                       onChange={(e) => useDeploymentStore.getState().updateDockerImage(image.id, "tag", e.target.value)}
                     />
                   </div>
-                  <div className="w-24 space-y-2">
+                  <div className="w-20 min-w-[80px] space-y-2">
                     <Label>Puerto</Label>
                     <Input
+                      className="h-9 text-sm"
                       placeholder="80"
                       value={image.port || ""}
                       onChange={(e) => useDeploymentStore.getState().updateDockerImage(image.id, "port", e.target.value)}
                     />
                   </div>
-                  <div className="w-24 space-y-2">
+                  <div className="w-20 min-w-[80px] space-y-2">
                     <Label>CPU</Label>
                     <Input
+                      className="h-9 text-sm"
                       placeholder="256"
                       value={image.cpu || ""}
                       onChange={(e) => useDeploymentStore.getState().updateDockerImage(image.id, "cpu", e.target.value)}
                     />
                   </div>
-                  <div className="w-24 space-y-2">
+                  <div className="w-20 min-w-[80px] space-y-2">
                     <Label>Memoria</Label>
                     <Input
+                      className="h-9 text-sm"
                       placeholder="512"
                       value={image.memory || ""}
                       onChange={(e) => useDeploymentStore.getState().updateDockerImage(image.id, "memory", e.target.value)}
+                    />
+                  </div>
+                  {/* Nuevo switch para actualizar/reemplazar imagen */}
+                  <div className="flex items-center mb-2">
+                    <Switch
+                      checked={modalImageId === image.id}
+                      onCheckedChange={(checked) => checked ? setModalImageId(image.id) : setModalImageId(null)}
                     />
                   </div>
                   {useDeploymentStore.getState().dockerImages.length > 1 && (
@@ -249,6 +265,24 @@ export function ECSConfiguration() {
                   Agregar Imagen Docker
                 </Button>
               )}
+              {/* Modal para actualizar/reemplazar imagen */}
+              <Dialog open={!!modalImageId} onOpenChange={(open) => !open && setModalImageId(null)}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>¿Qué deseas hacer con la imagen?</DialogTitle>
+                    <DialogDescription>
+                      Puedes actualizar la imagen (pull del mismo tag) o reemplazarla por una nueva.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="flex gap-4 mt-4">
+                    <Button onClick={() => { setModalType("update"); setModalImageId(null); }}>Actualizar</Button>
+                    <Button variant="outline" onClick={() => { setModalType("replace"); setModalImageId(null); }}>Reemplazar</Button>
+                    <DialogClose asChild>
+                      <Button variant="ghost">Cancelar</Button>
+                    </DialogClose>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
           </TabsContent>
 

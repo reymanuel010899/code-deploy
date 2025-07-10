@@ -39,6 +39,7 @@ import { DeploymentProvider } from "@/providers/deploymentProvider"
 import type { DeploymentRequest, DeploymentResponse } from "@/types/api"
 import { useDeployment } from "@/hooks/useDeployment"
 import { createDockerImages } from "../src/providers/images"
+import { ServiceDeploymentHistory } from "../src/components/common/ServiceDeploymentHistory"
 
 interface DockerImage {
   id: string
@@ -1014,6 +1015,8 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                 </TabsContent>
               </Tabs>
             </CardContent>
+            {/* Insert history session here for SkyBox only */}
+            <ServiceDeploymentHistory />
           </Card>
         )
 
