@@ -263,11 +263,8 @@ export class DeploymentProvider {
    */
   static async fetchDeploymentsFromLocalApi(): Promise<any[]> {
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/deployments/")
-      if (!response.ok) throw new Error("Error al obtener deployments desde API local")
-      const data = await response.json()
-      console.log(data)
-      return data
+      const response = apiClient.get("/deployments/")
+      return response.deployments || []
     } catch (error) {
       console.error("Error fetching deployments from local API:", error)
       throw error

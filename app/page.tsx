@@ -40,6 +40,7 @@ import type { DeploymentRequest, DeploymentResponse } from "@/types/api"
 import { useDeployment } from "@/hooks/useDeployment"
 import { createDockerImages } from "../src/providers/images"
 import { ServiceDeploymentHistory } from "../src/components/common/ServiceDeploymentHistory"
+import { useAuth } from "@/providers/auth/AuthProvider";
 
 interface DockerImage {
   id: string
@@ -364,7 +365,7 @@ export default function CloudInterface() {
   ]
 
   const operatingSystems = [
-    { value: "amazon-linux-2", label: "Amazon Linux 2", icon: "🐧" },
+    { value: "amazon-linux-2", label: "Amazon Linux 2", icon: "🐳" },
     { value: "ubuntu-20.04", label: "Ubuntu 20.04 LTS", icon: "🟠" },
     { value: "ubuntu-22.04", label: "Ubuntu 22.04 LTS", icon: "🟠" },
     { value: "windows-2019", label: "Windows Server 2019", icon: "🪟" },
@@ -1323,6 +1324,18 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
     } finally {
       setIsDeploying(false)
     }
+  }
+
+  const { isAuthenticated } = useAuth();
+
+  // Debug temporal
+  console.log('🔍 Estado de autenticación en página principal:', isAuthenticated);
+  console.log('🔍 Token en localStorage:', typeof window !== 'undefined' ? localStorage.getItem('accessToken') : 'N/A');
+  console.log('🔍 Cookies:', typeof window !== 'undefined' ? document.cookie : 'N/A');
+
+  if (!isAuthenticated) {
+    // Eliminado: bloque de botones y forms de inicio de sesión y registro
+    return null;
   }
 
   return (
