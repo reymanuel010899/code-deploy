@@ -29,16 +29,8 @@ export function ServiceDeploymentHistory() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [service])
 console.log(service, "----")
-  // Mostrar los 5 más recientes. Si el servicio es 'ecs', mostrar todos (el backend no envía 'service')
-  let filtered = deployments
-  if (service === "ecs") {
-    filtered = deployments.slice(-5).reverse()
-  } else {
-    filtered = deployments.filter(d => d && d.status && d.service === '').slice(-5).reverse()
-  }
-
-  //prueba  ----------
-  filtered = deployments.slice(-5).reverse()
+  // Mostrar los 5 más recientes SOLO del servicio actual
+  let filtered = deployments.filter(d => d && d.status && d.service === service).slice(-5).reverse();
   //-------------------
   console.log('deployments:', deployments)
   console.log('filtered:', filtered)

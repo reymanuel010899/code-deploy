@@ -41,6 +41,8 @@ import { useDeployment } from "@/hooks/useDeployment"
 import { createDockerImages } from "../src/providers/images"
 import { ServiceDeploymentHistory } from "../src/components/common/ServiceDeploymentHistory"
 import { useAuth } from "@/providers/auth/AuthProvider";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 interface DockerImage {
   id: string
@@ -110,7 +112,7 @@ interface LambdaConfig {
 
 export default function CloudInterface() {
   const [dockerImages, setDockerImages] = useState<DockerImage[]>([{
-    id: "1",
+    id: Date.now().toString(),
     name: "",
     tag: "latest",
     port: 80,
@@ -402,32 +404,45 @@ export default function CloudInterface() {
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label>Imagen Docker</Label>
-                  <Input
-                    placeholder="nginx, tu-app:latest, mi-landing"
-                    value={dockerImages[0].name}
-                    onChange={e => updateDockerImage(dockerImages[0].id, "name", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Tag</Label>
-                  <Input
-                    placeholder="latest"
-                    value={dockerImages[0].tag}
-                    onChange={e => updateDockerImage(dockerImages[0].id, "tag", e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Puerto de la App</Label>
-                  <Input
-                    placeholder="80"
-                    type="number"
-                    value={dockerImages[0].port}
-                    onChange={e => updateDockerImage(dockerImages[0].id, "port", Number(e.target.value))}
-                  />
-                  <p className="text-xs text-slate-500">El puerto que expone tu contenedor (por ejemplo, 80 para nginx o 3000 para apps Node.js)</p>
-                </div>
+                {dockerImages.length === 0 ? (
+                  <Button
+                    variant="outline"
+                    onClick={addDockerImage}
+                    className="w-full border-dashed border-2 hover:bg-slate-50"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Agregar Imagen Docker
+                  </Button>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <Label>Imagen Docker</Label>
+                      <Input
+                        placeholder="nginx, tu-app:latest, mi-landing"
+                        value={dockerImages[0]?.name || ""}
+                        onChange={e => updateDockerImage(dockerImages[0].id, "name", e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Tag</Label>
+                      <Input
+                        placeholder="latest"
+                        value={dockerImages[0]?.tag || ""}
+                        onChange={e => updateDockerImage(dockerImages[0].id, "tag", e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Puerto de la App</Label>
+                      <Input
+                        placeholder="80"
+                        type="number"
+                        value={dockerImages[0]?.port || ""}
+                        onChange={e => updateDockerImage(dockerImages[0].id, "port", Number(e.target.value))}
+                      />
+                      <p className="text-xs text-slate-500">El puerto que expone tu contenedor (por ejemplo, 80 para nginx o 3000 para apps Node.js)</p>
+                    </div>
+                  </>
+                )}
                 <div className="mt-6 p-4 bg-pink-50 rounded-lg border border-pink-200">
                   <h4 className="font-medium mb-2 text-pink-900 flex items-center gap-2">
                     <Server className="h-4 w-4" /> ¿Cómo funciona?
@@ -495,21 +510,19 @@ export default function CloudInterface() {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="task" className="space-y-6 mt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <Label className="text-2xl font-bold">CPU (vCPU)</Label>
-                        <Badge variant="secondary" className="text-lg px-4 py-2">{ecsConfig.taskCpu}</Badge>
-                      </div>
+                <TabsContent value="task" className="space-y-4 mt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-base font-semibold">CPU (vCPU)</Label>
+                      <Badge variant="secondary" className="text-xs px-2 py-1">{ecsConfig.taskCpu}</Badge>
                       <Select
                         value={ecsConfig.taskCpu.toString()}
                         onValueChange={(value) => setECSConfig({ ...ecsConfig, taskCpu: Number.parseInt(value) })}
                       >
-                        <SelectTrigger className="h-14 text-xl font-semibold border-2 border-blue-300 rounded-xl">
+                        <SelectTrigger className="h-9 text-sm font-normal border rounded-md">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent className="text-lg">
+                        <SelectContent className="text-sm">
                           <SelectItem value="256">0.25 vCPU (256)</SelectItem>
                           <SelectItem value="512">0.5 vCPU (512)</SelectItem>
                           <SelectItem value="1024">1 vCPU (1024)</SelectItem>
@@ -520,20 +533,17 @@ export default function CloudInterface() {
                         </SelectContent>
                       </Select>
                     </div>
-
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center">
-                        <Label className="text-2xl font-bold">Memoria (MB)</Label>
-                        <Badge variant="secondary" className="text-lg px-4 py-2">{ecsConfig.taskMemory} MB</Badge>
-                      </div>
+                    <div className="space-y-2">
+                      <Label className="text-base font-semibold">Memoria (MB)</Label>
+                      <Badge variant="secondary" className="text-xs px-2 py-1">{ecsConfig.taskMemory} MB</Badge>
                       <Select
                         value={ecsConfig.taskMemory.toString()}
                         onValueChange={(value) => setECSConfig({ ...ecsConfig, taskMemory: Number.parseInt(value) })}
                       >
-                        <SelectTrigger className="h-14 text-xl font-semibold border-2 border-blue-300 rounded-xl">
+                        <SelectTrigger className="h-9 text-sm font-normal border rounded-md">
                           <SelectValue />
                         </SelectTrigger>
-                        <SelectContent className="text-lg">
+                        <SelectContent className="text-sm">
                           <SelectItem value="512">512 MB</SelectItem>
                           <SelectItem value="1024">1 GB (1024 MB)</SelectItem>
                           <SelectItem value="2048">2 GB (2048 MB)</SelectItem>
@@ -1207,25 +1217,8 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
 
   // Función para ordenar las imágenes Docker
   function ordenarDockerImages(images: DockerImage[]) {
-    // Define palabras clave para cada tipo
-    const esServidorWeb = (name: string) =>
-      /nginx|apache|caddy|httpd/i.test(name);
-    const esBaseDeDatos = (name: string) =>
-      /mysql|postgres|mariadb|mongo|redis|db/i.test(name);
-    // La app web será la que no sea ni servidor web ni base de datos
-
-    let servidorWeb: DockerImage | undefined;
-    let appWeb: DockerImage | undefined;
-    let baseDeDatos: DockerImage | undefined;
-
-    images.forEach(img => {
-      if (esServidorWeb(img.name)) servidorWeb = img;
-      else if (esBaseDeDatos(img.name)) baseDeDatos = img;
-      else appWeb = img;
-    });
-
-    // Devuelve el array en el orden: [servidorWeb, appWeb, baseDeDatos]
-    return [servidorWeb, appWeb, baseDeDatos].filter(Boolean) as DockerImage[];
+    // Solo devolver las imágenes que tengan nombre (las que el usuario ingresó)
+    return images.filter(img => img.name && img.name.trim() !== "");
   }
 
   const handleDeploy = async () => {
@@ -1255,7 +1248,8 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                 { name: "MYSQL_USER", value: databaseCredentials.databaseUser },
                 { name: "MYSQL_PASSWORD", value: databaseCredentials.databasePassword },
                 { name: "MYSQL_PORT", value: databaseCredentials.mysqlPort },
-              ].filter(env => env.value.trim() !== "") // Solo incluir variables con valor
+              ].filter(env => env.value.trim() !== ""), // Solo incluir variables con valor
+              regions: selectedRegions, // <-- Agrego las regiones seleccionadas
             },
             docker_images: dockerImagesOrdenadas,
             service: "ecs",
@@ -1327,14 +1321,15 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
   }
 
   const { isAuthenticated } = useAuth();
+  const router = useRouter();
 
-  // Debug temporal
-  console.log('🔍 Estado de autenticación en página principal:', isAuthenticated);
-  console.log('🔍 Token en localStorage:', typeof window !== 'undefined' ? localStorage.getItem('accessToken') : 'N/A');
-  console.log('🔍 Cookies:', typeof window !== 'undefined' ? document.cookie : 'N/A');
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.replace("/sign-in");
+    }
+  }, [isAuthenticated, router]);
 
   if (!isAuthenticated) {
-    // Eliminado: bloque de botones y forms de inicio de sesión y registro
     return null;
   }
 

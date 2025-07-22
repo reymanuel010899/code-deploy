@@ -24,6 +24,8 @@ class ApiClient {
       if (!token && !this.apiKey && !isPublicEndpoint) {
         window.location.href = "/sign-in";
         return Promise.reject(new Error("No hay token de autenticación. Redirigiendo a login..."));
+      }else if (!token && !isPublicEndpoint){
+        window.location.href = "/sign-in";
       }
       if (token) {
         headers["Authorization"] = `Bearer ${token}`
