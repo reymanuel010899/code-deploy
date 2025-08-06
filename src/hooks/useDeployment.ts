@@ -92,6 +92,12 @@ export const useDeployment = () => {
             environmentVars: lambdaConfig.environmentVars,
             trigger: lambdaConfig.trigger,
             deadLetterQueue: lambdaConfig.deadLetterQueue,
+            codeFiles: lambdaConfig.codeFiles.map(file => ({
+              name: file.name,
+              content: file.content,
+              language: file.language,
+              isMain: file.isMain
+            }))
           }
           break
       }

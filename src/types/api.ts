@@ -66,6 +66,12 @@ export interface LambdaDeploymentConfig {
   environmentVars: string
   trigger: string
   deadLetterQueue: boolean
+  codeFiles?: {
+    name: string
+    content: string
+    language: string
+    isMain?: boolean
+  }[]
 }
 
 export interface DockerImage {

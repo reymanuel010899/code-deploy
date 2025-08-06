@@ -59,6 +59,14 @@ export interface ECSConfig {
   memoryHardLimit?: number
 }
 
+export interface CodeFile {
+  id: string
+  name: string
+  content: string
+  language: string
+  isMain?: boolean
+}
+
 export interface LambdaConfig {
   runtime: string
   handler: string
@@ -67,6 +75,7 @@ export interface LambdaConfig {
   environmentVars: string
   trigger: string
   deadLetterQueue: boolean
+  codeFiles: CodeFile[]
 }
 
 export interface AWSRegion {
