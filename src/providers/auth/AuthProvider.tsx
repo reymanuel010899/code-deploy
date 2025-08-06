@@ -7,6 +7,7 @@ interface AuthContextType {
   accessToken: string | null
   logout: () => void
   setAuthenticated: (token: string) => void
+  isLoading: boolean
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -14,16 +15,19 @@ const AuthContext = createContext<AuthContextType>({
   accessToken: null,
   logout: () => {},
   setAuthenticated: () => {},
+  isLoading: true,
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accessToken, setAccessToken] = useState<string | null>(null)
   const [auth, setAuth] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
     const token = getAccessToken()
     setAccessToken(token)
     setAuth(!!token)
+    setIsLoading(false)
   }, [])
 
   const handleLogout = () => {
@@ -38,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated: auth, accessToken, logout: handleLogout, setAuthenticated }}>
+    <AuthContext.Provider value={{ isAuthenticated: auth, accessToken, logout: handleLogout, setAuthenticated, isLoading }}>
       {children}
     </AuthContext.Provider>
   )

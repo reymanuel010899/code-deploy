@@ -65,9 +65,9 @@ console.log(service, "----")
           <div>
             <CardTitle className="flex items-center gap-2">
               <History className="h-5 w-5" />
-              Deployments recientes de este servicio
+              Recent deployments of this service
             </CardTitle>
-            <CardDescription>Haz click en uno para editarlo</CardDescription>
+            <CardDescription>Click on one to edit it</CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={fetchDeployments} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -82,7 +82,7 @@ console.log(service, "----")
             </div>
           ) : filtered.length === 0 ? (
             <div className="text-center text-muted-foreground py-8">
-              No hay deployments para este servicio
+              There are no deployments for this service.
             </div>
           ) : (
             <div className="space-y-4">

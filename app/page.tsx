@@ -13,6 +13,8 @@ import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+// import Editor from "@monaco-editor/react";
+import Editor, { useMonaco } from "@monaco-editor/react";
 import {
   Cloud,
   Server,
@@ -43,6 +45,13 @@ import { ServiceDeploymentHistory } from "../src/components/common/ServiceDeploy
 import { useAuth } from "@/providers/auth/AuthProvider";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { apiClient } from "../src/providers/api"
+
+interface CheckDomainResponse {
+  available: boolean;
+  message: string;
+  price?: string;
+}
 
 interface DockerImage {
   id: string
@@ -67,6 +76,7 @@ interface EC2Config {
 
 interface ECSConfig {
   clusterName: string
+  domainName: string
   serviceName: string
   taskDefinitionFamily: string
   taskCpu: number
@@ -110,6 +120,7 @@ interface LambdaConfig {
   deadLetterQueue: boolean
 }
 
+
 export default function CloudInterface() {
   const [dockerImages, setDockerImages] = useState<DockerImage[]>([{
     id: Date.now().toString(),
@@ -137,6 +148,7 @@ export default function CloudInterface() {
 
   const [ecsConfig, setECSConfig] = useState<ECSConfig>({
     clusterName: "",
+    domainName: "",
     serviceName: "",
     taskDefinitionFamily: "",
     taskCpu: 256,
@@ -178,6 +190,12 @@ export default function CloudInterface() {
   })
 
   const [isDeploying, setIsDeploying] = useState(false)
+  const [isCheckingDomain, setIsCheckingDomain] = useState(false)
+  const [domainAvailability, setDomainAvailability] = useState<{
+    available: boolean;
+    message: string;
+    price?: string;
+  } | null>(null)
 
   // Estado para las credenciales de base de datos
   const [databaseCredentials, setDatabaseCredentials] = useState({
@@ -214,7 +232,7 @@ export default function CloudInterface() {
           try {
             await createDockerImages({ "name": img.name, "tag": img.tag })
           } catch (error) {
-            console.error("Error creando imagen Docker:", error)
+            console.error("Error creating Docker image:", error)
           }
         }
       })
@@ -256,6 +274,45 @@ export default function CloudInterface() {
     setCurrentRegionIndex((prev) => (prev <= 0 ? maxIndex : prev - 1))
   }
 
+  const checkDomainAvailability = async (domain: string) => {
+    if (!domain || domain.trim() === '') {
+      setDomainAvailability(null)
+      return
+    }
+
+    setIsCheckingDomain(true)
+    try {
+      const response = await apiClient.post<CheckDomainResponse>('/check-domain/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ domain: domain.trim(), tld: "com"  }) // You can change the TLD as needed,
+      })
+      console.log('Domain check response:', response)
+      if (response) {
+        setDomainAvailability({
+          available: response.available,
+          message: response.message,
+          price: "price" in response ? response.price : undefined,
+        })
+      } else {
+        setDomainAvailability({
+          available: false,
+          message: 'Error checking domain availability'
+        })
+      }
+    } catch (error) {
+      console.error('Error checking domain:', error)
+      setDomainAvailability({
+        available: false,
+        message: 'Error checking domain availability'
+      })
+    } finally {
+      setIsCheckingDomain(false)
+    }
+  }
+
   const calculateCost = () => {
     let baseCost = 0
     const regionMultiplier = selectedRegions.length
@@ -287,21 +344,21 @@ export default function CloudInterface() {
     {
       id: "pagedrop",
       name: "PageDrop",
-      description: "Despliega páginas web y landings en segundos",
+      description: "Deploy web pages and landings in seconds",
       icon: Server,
       color: "bg-pink-500",
     },
     {
       id: "ecs",
       name: "SkyBox",
-      description: "Tu app, lista para despegar",
+      description: "Your app, ready to take off",
       icon: Container,
       color: "bg-blue-500",
     },
     {
       id: "lambda",
       name: "Zaplet",
-      description: "Ejecución instantánea en la nube",
+      description: "Instant cloud execution",
       icon: Cloud,
       color: "bg-green-500",
     },
@@ -312,56 +369,56 @@ export default function CloudInterface() {
       id: "us-east-1",
       name: "US East (N. Virginia)",
       flag: "🇺🇸",
-      latency: "Baja",
+      latency: "Low",
       color: "bg-blue-500",
     },
     {
       id: "us-west-2",
       name: "US West (Oregon)",
       flag: "🇺🇸",
-      latency: "Baja",
+      latency: "Low",
       color: "bg-blue-600",
     },
     {
       id: "eu-west-1",
       name: "Europe (Ireland)",
       flag: "🇮🇪",
-      latency: "Media",
+      latency: "Medium",
       color: "bg-green-500",
     },
     {
       id: "eu-central-1",
       name: "Europe (Frankfurt)",
       flag: "🇩🇪",
-      latency: "Media",
+      latency: "Medium",
       color: "bg-green-600",
     },
     {
       id: "ap-southeast-1",
       name: "Asia Pacific (Singapore)",
       flag: "🇸🇬",
-      latency: "Alta",
+      latency: "High",
       color: "bg-orange-500",
     },
     {
       id: "ap-northeast-1",
       name: "Asia Pacific (Tokyo)",
       flag: "🇯🇵",
-      latency: "Alta",
+      latency: "High",
       color: "bg-orange-600",
     },
     {
       id: "sa-east-1",
       name: "South America (São Paulo)",
       flag: "🇧🇷",
-      latency: "Alta",
+      latency: "High",
       color: "bg-purple-500",
     },
     {
       id: "ca-central-1",
       name: "Canada (Central)",
       flag: "🇨🇦",
-      latency: "Baja",
+      latency: "Low",
       color: "bg-red-500",
     },
   ]
@@ -396,10 +453,10 @@ export default function CloudInterface() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Server className="h-5 w-5" />
-                Configuración PageDrop
+                PageDrop Configuration
               </CardTitle>
               <CardDescription>
-                Despliega tu landing page o sitio web estático en la nube de forma sencilla. Solo necesitas tu imagen Docker lista para servir tu app (por ejemplo, nginx, node, etc).
+                Deploy your landing page or static website to the cloud easily. You only need your Docker image ready to serve your app (e.g., nginx, node, etc.).
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -411,14 +468,14 @@ export default function CloudInterface() {
                     className="w-full border-dashed border-2 hover:bg-slate-50"
                   >
                     <Plus className="h-4 w-4 mr-2" />
-                    Agregar Imagen Docker
+                    Add Docker Image
                   </Button>
                 ) : (
                   <>
                     <div className="space-y-2">
-                      <Label>Imagen Docker</Label>
+                      <Label>Docker Image</Label>
                       <Input
-                        placeholder="nginx, tu-app:latest, mi-landing"
+                        placeholder="nginx, your-app:latest, my-landing"
                         value={dockerImages[0]?.name || ""}
                         onChange={e => updateDockerImage(dockerImages[0].id, "name", e.target.value)}
                       />
@@ -432,25 +489,25 @@ export default function CloudInterface() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label>Puerto de la App</Label>
+                      <Label>App Port</Label>
                       <Input
                         placeholder="80"
                         type="number"
                         value={dockerImages[0]?.port || ""}
                         onChange={e => updateDockerImage(dockerImages[0].id, "port", Number(e.target.value))}
                       />
-                      <p className="text-xs text-slate-500">El puerto que expone tu contenedor (por ejemplo, 80 para nginx o 3000 para apps Node.js)</p>
+                      <p className="text-xs text-slate-500">The port exposed by your container (e.g., 80 for nginx or 3000 for Node.js apps)</p>
                     </div>
                   </>
                 )}
                 <div className="mt-6 p-4 bg-pink-50 rounded-lg border border-pink-200">
                   <h4 className="font-medium mb-2 text-pink-900 flex items-center gap-2">
-                    <Server className="h-4 w-4" /> ¿Cómo funciona?
+                    <Server className="h-4 w-4" /> How it works?
                   </h4>
                   <ul className="list-disc pl-6 text-pink-800 text-sm space-y-1">
-                    <li>Solo necesitas una imagen Docker que sirva tu página web o landing.</li>
-                    <li>El sistema desplegará tu contenedor en la nube y te dará una URL pública.</li>
-                    <li>No necesitas configurar recursos, solo enfócate en tu contenido.</li>
+                    <li>You only need a Docker image that serves your web page or landing.</li>
+                    <li>The system will deploy your container to the cloud and give you a public URL.</li>
+                    <li>You don't need to configure resources, just focus on your content.</li>
                   </ul>
                 </div>
               </div>
@@ -463,9 +520,9 @@ export default function CloudInterface() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Container className="h-5 w-5" />
-                Configuración SkyBox
+                SkyBox Configuration
               </CardTitle>
-              <CardDescription>Configura tu servicio de contenedores administrado</CardDescription>
+              <CardDescription>Configure your managed container service</CardDescription>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="cluster" className="w-full">
@@ -473,29 +530,74 @@ export default function CloudInterface() {
                   <TabsTrigger value="cluster">Cluster</TabsTrigger>
                   <TabsTrigger value="task">Task Definition</TabsTrigger>
                   <TabsTrigger value="service">Service</TabsTrigger>
-                  <TabsTrigger value="advanced">Avanzado</TabsTrigger>
+                  <TabsTrigger value="advanced">Advanced</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="cluster" className="space-y-6 mt-6">
                   <div className="space-y-4">
+                   
+
+                    <div className="space-y-2">
+                      <Label>Domain Name</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="myapp.com"
+                          value={ecsConfig.domainName}
+                          onChange={(e) => {
+                            setECSConfig({ ...ecsConfig, domainName: e.target.value })
+                            // Check domain availability when user stops typing
+                            const timeoutId = setTimeout(() => {
+                              checkDomainAvailability(e.target.value)
+                            }, 1000)
+                            return () => clearTimeout(timeoutId)
+                          }}
+                        />
+                        {isCheckingDomain && (
+                          <Button variant="outline" disabled>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          </Button>
+                        )}
+                      </div>
+                      {domainAvailability && (
+                        <div className={`mt-2 p-2 rounded-md text-sm ${
+                          domainAvailability.available 
+                            ? 'bg-green-50 text-green-800 border border-green-200' 
+                            : 'bg-red-50 text-red-800 border border-red-200'
+                        }`}>
+                          <div className="flex items-center gap-2">
+                            {domainAvailability.available ? (
+                              <span className="text-green-600">✓</span>
+                            ) : (
+                              <span className="text-red-600">✗</span>
+                            )}
+                            <span>{domainAvailability.message}</span>
+                          </div>
+                          {/* {domainAvailability.available && domainAvailability.price && (
+                            <div className="mt-1 text-xs">
+                              Price: ${domainAvailability.price}/year
+                            </div>
+                          )} */}
+                        </div>
+                      )}
+                    </div>
                     <div className="space-y-2">
                       <Label>Deployment Name</Label>
                       <Input
-                        placeholder="mi-aplicacion-cluster"
+                        placeholder="my-application-cluster"
                         value={ecsConfig.clusterName}
                         onChange={(e) => setECSConfig({ ...ecsConfig, clusterName: e.target.value })}
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Modo de Red</Label>
+                      <Label>Network Mode</Label>
                       <RadioGroup
                         value={ecsConfig.networkMode}
                         onValueChange={(value) => setECSConfig({ ...ecsConfig, networkMode: value })}
                       >
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="awsvpc" id="awsvpc" />
-                          <Label htmlFor="awsvpc">awsvpc (Recomendado)</Label>
+                          <Label htmlFor="awsvpc">awsvpc (Recommended)</Label>
                         </div>
                         <div className="flex items-center space-x-2">
                           <RadioGroupItem value="bridge" id="bridge" />
@@ -560,9 +662,9 @@ export default function CloudInterface() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Container className="h-5 w-5" />
-                        Sube Tus Imágenes de Cualquier Repositorio o Proveedor de Contenedores
+                        Upload Your Images from Any Repository or Container Provider
                       </CardTitle>
-                      <CardDescription>Configura hasta 3 imágenes Docker para tu aplicación. Asigna CPU y Memoria a cada contenedor.</CardDescription>
+                      <CardDescription>Configure up to 3 Docker images for your application. Assign CPU and Memory to each container.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {/* Switch para contenedores privados/públicos */}
@@ -573,19 +675,19 @@ export default function CloudInterface() {
                           id="private-registry-switch"
                         />
                         <Label htmlFor="private-registry-switch" className="font-medium">
-                          ¿Tus contenedores son privados?
+                          Are your containers private?
                         </Label>
                         <span className="text-xs text-slate-500">(Docker Hub, GitHub Packages, ECR, etc)</span>
                       </div>
                       {isPrivateRegistry && (
                         <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                           <div className="mb-2 text-blue-900 font-semibold text-sm">
-                            Ingresa las credenciales de tu repositorio privado. <br />
-                            <span className="font-normal">Estas credenciales estarán <span className="font-bold">cifradas</span> y seguras con token de acceso temporales, solo se usarán para autenticar la descarga de tus imágenes.</span>
+                            Enter your private repository credentials. <br />
+                            <span className="font-normal">These credentials will be <span className="font-bold">encrypted</span> and secure with temporary access tokens, they will only be used to authenticate the download of your images.</span>
                           </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                              <Label htmlFor="private-username">Usuario</Label>
+                              <Label htmlFor="private-username">Username</Label>
                               <Input
                                 id="private-username"
                                 placeholder="username"
@@ -594,7 +696,7 @@ export default function CloudInterface() {
                               />
                             </div>
                             <div>
-                              <Label htmlFor="private-password">Contraseña</Label>
+                              <Label htmlFor="private-password">Password</Label>
                               <Input
                                 id="private-password"
                                 placeholder="password"
@@ -609,7 +711,7 @@ export default function CloudInterface() {
                       {dockerImages.map((image, index) => (
                         <div key={image.id} className="flex gap-3 items-end flex-wrap">
                           <div className="flex-1 min-w-[120px] space-y-2">
-                            <Label>Imagen {index + 1}</Label>
+                            <Label>Image {index + 1}</Label>
                             <Input
                               placeholder="nginx, node:18, postgres:15"
                               value={image.name}
@@ -617,7 +719,7 @@ export default function CloudInterface() {
                             />
                           </div>
                           <div className="flex-1 min-w-[80px] space-y-2">
-                            <Label>Puerto</Label>
+                            <Label>Port</Label>
                             <Input
                               placeholder="443, 80, 5432"
                               type="number"
@@ -652,7 +754,7 @@ export default function CloudInterface() {
                             </Select>
                           </div>
                           <div className="w-32 min-w-[80px] space-y-2">
-                            <Label>Memoria (MB)</Label>
+                            <Label>Memory (MB)</Label>
                             <Select
                               value={image.memory.toString()}
                               onValueChange={value => updateDockerImage(image.id, "memory", Number(value))}
@@ -688,7 +790,7 @@ export default function CloudInterface() {
                           className="w-full border-dashed border-2 hover:bg-slate-50"
                         >
                           <Plus className="h-4 w-4 mr-2" />
-                          Agregar Imagen Docker
+                          Add Docker Image
                         </Button>
                       )}
 
@@ -696,14 +798,14 @@ export default function CloudInterface() {
                       <div className="mt-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
                         <h4 className="font-medium mb-4 flex items-center gap-2">
                           <Database className="h-5 w-5" />
-                          Credenciales de Base de Datos
+                          Database Credentials
                         </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <Label htmlFor="mysql-root-password">ROOT_PASSWORD</Label>
                             <Input
                               id="mysql-root-password"
-                              placeholder="tu-password-segura"
+                              placeholder="your-secure-password"
                               type="password"
                               value={databaseCredentials.rootPassword}
                               onChange={(e) => setDatabaseCredentials({...databaseCredentials, rootPassword: e.target.value})}
@@ -713,7 +815,7 @@ export default function CloudInterface() {
                             <Label htmlFor="mysql-database">DATABASE_NAME</Label>
                             <Input
                               id="mysql-database"
-                              placeholder="basededatos"
+                              placeholder="database"
                               value={databaseCredentials.databaseName}
                               onChange={(e) => setDatabaseCredentials({...databaseCredentials, databaseName: e.target.value})}
                             />
@@ -722,7 +824,7 @@ export default function CloudInterface() {
                             <Label htmlFor="mysql-user">DATABASE_USER</Label>
                             <Input
                               id="mysql-user"
-                              placeholder="usuario"
+                              placeholder="user"
                               value={databaseCredentials.databaseUser}
                               onChange={(e) => setDatabaseCredentials({...databaseCredentials, databaseUser: e.target.value})}
                             />
@@ -731,7 +833,7 @@ export default function CloudInterface() {
                             <Label htmlFor="mysql-password">DATABASE_PASSWORD</Label>
                             <Input
                               id="mysql-password"
-                              placeholder="password-del-usuario"
+                              placeholder="user-password"
                               type="password"
                               value={databaseCredentials.databasePassword}
                               onChange={(e) => setDatabaseCredentials({...databaseCredentials, databasePassword: e.target.value})}
@@ -751,9 +853,9 @@ export default function CloudInterface() {
                         {/* Ejemplo de acceso a variables de entorno */}
                         <div className="mt-8 p-6 bg-gradient-to-br from-blue-100 to-blue-50 rounded-2xl border border-blue-200 shadow-md">
                           <h5 className="font-bold mb-3 flex items-center gap-2 text-blue-900 text-xl">
-                            <Code className="h-6 w-6" /> Ejemplo de acceso a las variables de entorno en Python
+                            <Code className="h-6 w-6" /> Example of accessing environment variables in Python
                           </h5>
-                          <p className="text-base text-blue-800 mb-3">Puedes acceder a las credenciales de tu base de datos usando variables de entorno de la siguiente manera:</p>
+                          <p className="text-base text-blue-800 mb-3">You can access your database credentials using environment variables as follows:</p>
                           <pre className="bg-blue-200 text-blue-900 rounded-lg p-4 text-base font-mono overflow-x-auto shadow-inner">
 {`import os
 
@@ -773,9 +875,9 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                         if (totalCpu > ecsConfig.taskCpu || totalMemory > ecsConfig.taskMemory) {
                           return (
                             <div className="text-red-600 text-sm font-medium mt-2">
-                              La suma de CPU o Memoria de los contenedores excede el límite definido en Task Definition.<br />
-                              CPU total: {totalCpu} / {ecsConfig.taskCpu} | Memoria total: {totalMemory} / {ecsConfig.taskMemory}<br />
-                              <span className="font-semibold">Para agregar más recursos, aumenta el límite de CPU o Memoria en la sección Task Definition.</span>
+                              The sum of CPU or Memory of the containers exceeds the limit defined in Task Definition.<br />
+                              Total CPU: {totalCpu} / {ecsConfig.taskCpu} | Total Memory: {totalMemory} / {ecsConfig.taskMemory}<br />
+                              <span className="font-semibold">To add more resources, increase the CPU or Memory limit in the Task Definition section.</span>
                             </div>
                           )
                         }
@@ -789,7 +891,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-3">
                       <div className="flex justify-between">
-                        <Label>Número de Tareas Deseadas</Label>
+                        <Label>Desired Number of Tasks</Label>
                         <Badge variant="secondary">{ecsConfig.desiredCount}</Badge>
                       </div>
                       <Slider
@@ -824,7 +926,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                   {ecsConfig.autoScaling && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg">
                       <div className="space-y-2">
-                        <Label>Capacidad Mínima</Label>
+                        <Label>Minimum Capacity</Label>
                         <Input
                           type="number"
                           value={ecsConfig.minCapacity}
@@ -833,7 +935,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Capacidad Máxima</Label>
+                        <Label>Maximum Capacity</Label>
                         <Input
                           type="number"
                           value={ecsConfig.maxCapacity}
@@ -848,29 +950,29 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                 <TabsContent value="advanced" className="space-y-6 mt-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Nombre del Servicio</Label>
+                      <Label>Service Name</Label>
                       <Input
-                        placeholder="mi-servicio"
+                        placeholder="my-service"
                         value={ecsConfig.serviceName}
                         onChange={(e) => setECSConfig({ ...ecsConfig, serviceName: e.target.value })}
                       />
-                      <p className="text-xs text-slate-500">Si está vacío, se generará automáticamente</p>
+                      <p className="text-xs text-slate-500">If empty, it will be generated automatically</p>
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Familia de Task Definition</Label>
+                      <Label>Task Definition Family</Label>
                       <Input
-                        placeholder="mi-task-definition"
+                        placeholder="my-task-definition"
                         value={ecsConfig.taskDefinitionFamily}
                         onChange={(e) => setECSConfig({ ...ecsConfig, taskDefinitionFamily: e.target.value })}
                       />
-                      <p className="text-xs text-slate-500">Si está vacío, se generará automáticamente</p>
+                      <p className="text-xs text-slate-500">If empty, it will be generated automatically</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Puerto del Contenedor</Label>
+                      <Label>Container Port</Label>
                       <Input
                         type="number"
                         placeholder="80"
@@ -880,7 +982,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Protocolo</Label>
+                      <Label>Protocol</Label>
                       <Select
                         value={ecsConfig.protocol}
                         onValueChange={(value) => setECSConfig({ ...ecsConfig, protocol: value })}
@@ -904,7 +1006,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                         value={ecsConfig.subnets.join(',')}
                         onChange={(e) => setECSConfig({ ...ecsConfig, subnets: e.target.value.split(',').filter(s => s.trim()) })}
                       />
-                      <p className="text-xs text-slate-500">Separadas por comas</p>
+                      <p className="text-xs text-slate-500">Comma separated</p>
                     </div>
 
                     <div className="space-y-2">
@@ -914,7 +1016,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                         value={ecsConfig.securityGroups.join(',')}
                         onChange={(e) => setECSConfig({ ...ecsConfig, securityGroups: e.target.value.split(',').filter(s => s.trim()) })}
                       />
-                      <p className="text-xs text-slate-500">Separadas por comas</p>
+                      <p className="text-xs text-slate-500">Comma separated</p>
                     </div>
                   </div>
 
@@ -924,7 +1026,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                         checked={ecsConfig.assignPublicIp}
                         onCheckedChange={(checked) => setECSConfig({ ...ecsConfig, assignPublicIp: checked })}
                       />
-                      <Label>Asignar IP Pública</Label>
+                      <Label>Assign Public IP</Label>
                     </div>
 
                     <div className="flex items-center space-x-2">
@@ -932,25 +1034,25 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                         checked={ecsConfig.essential}
                         onCheckedChange={(checked) => setECSConfig({ ...ecsConfig, essential: checked })}
                       />
-                      <Label>Contenedor Esencial</Label>
+                      <Label>Essential Container</Label>
                     </div>
                   </div>
 
                   <Separator />
 
                   <div className="space-y-4">
-                    <h4 className="font-medium">Configuración de Logs</h4>
+                    <h4 className="font-medium">Logs Configuration</h4>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label>Log Group</Label>
                         <Input
-                          placeholder="/ecs/mi-aplicacion"
+                          placeholder="/ecs/my-application"
                           value={ecsConfig.logGroup}
                           onChange={(e) => setECSConfig({ ...ecsConfig, logGroup: e.target.value })}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Región de Logs</Label>
+                        <Label>Log Region</Label>
                         <Input
                           placeholder="us-east-1"
                           value={ecsConfig.logRegion}
@@ -958,7 +1060,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>Prefijo de Log Stream</Label>
+                        <Label>Log Stream Prefix</Label>
                         <Input
                           placeholder="ecs"
                           value={ecsConfig.logStreamPrefix}
@@ -977,7 +1079,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                         checked={ecsConfig.healthCheckEnabled}
                         onCheckedChange={(checked) => setECSConfig({ ...ecsConfig, healthCheckEnabled: checked })}
                       />
-                      <Label>Habilitar Health Check</Label>
+                      <Label>Enable Health Check</Label>
                     </div>
 
                     {ecsConfig.healthCheckEnabled && (
@@ -991,7 +1093,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Intervalo (segundos)</Label>
+                          <Label>Interval (seconds)</Label>
                           <Input
                             type="number"
                             value={ecsConfig.healthCheckInterval}
@@ -1001,7 +1103,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Timeout (segundos)</Label>
+                          <Label>Timeout (seconds)</Label>
                           <Input
                             type="number"
                             value={ecsConfig.healthCheckTimeout}
@@ -1011,7 +1113,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Reintentos</Label>
+                          <Label>Retries</Label>
                           <Input
                             type="number"
                             value={ecsConfig.healthCheckRetries}
@@ -1037,15 +1139,15 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Zap className="h-5 w-5" />
-                Configuración Lambda
+                Lambda Configuration
               </CardTitle>
-              <CardDescription>Configura tu función serverless</CardDescription>
+              <CardDescription>Configure your serverless function</CardDescription>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="runtime" className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="runtime">Runtime</TabsTrigger>
-                  <TabsTrigger value="config">Configuración</TabsTrigger>
+                  <TabsTrigger value="config">Configuration</TabsTrigger>
                   <TabsTrigger value="triggers">Triggers</TabsTrigger>
                 </TabsList>
 
@@ -1085,14 +1187,20 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Variables de Entorno</Label>
+                    <Label>Environment Variables</Label>
                     <Textarea
-                      placeholder="NODE_ENV=production&#10;API_KEY=tu-api-key&#10;DATABASE_URL=tu-database-url"
+                      placeholder="NODE_ENV=production&#10;API_KEY=your-api-key&#10;DATABASE_URL=your-database-url"
                       value={lambdaConfig.environmentVars}
                       onChange={(e) => setLambdaConfig({ ...lambdaConfig, environmentVars: e.target.value })}
                       rows={4}
                     />
-                    <p className="text-xs text-slate-500">Una variable por línea en formato CLAVE=valor</p>
+                    <Editor
+                        height="500px"
+                        defaultLanguage="python"
+                        defaultValue="// Escribe tu código aquí"
+                        theme="vs-dark"  
+                      />
+                    {/* <p className="text-xs text-slate-500">One variable per line in KEY=value format</p> */}
                   </div>
                 </TabsContent>
 
@@ -1102,7 +1210,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                       <div className="flex justify-between">
                         <Label className="flex items-center gap-2">
                           <Timer className="h-4 w-4" />
-                          Timeout (segundos)
+                          Timeout (seconds)
                         </Label>
                         <Badge variant="secondary">{lambdaConfig.timeout}s</Badge>
                       </div>
@@ -1141,11 +1249,11 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                   </div>
 
                   <div className="p-4 bg-green-50 rounded-lg">
-                    <h4 className="font-medium text-green-900 mb-2">Estimación de Rendimiento:</h4>
+                    <h4 className="font-medium text-green-900 mb-2">Performance Estimation:</h4>
                     <div className="text-sm text-green-800">
-                      <p>• CPU asignada: ~{Math.round((lambdaConfig.memory / 1769) * 1000)} MHz</p>
-                      <p>• Tiempo máximo de ejecución: {lambdaConfig.timeout} segundos</p>
-                      <p>• Memoria disponible: {lambdaConfig.memory} MB</p>
+                      <p>• Assigned CPU: ~{Math.round((lambdaConfig.memory / 1769) * 1000)} MHz</p>
+                      <p>• Maximum execution time: {lambdaConfig.timeout} seconds</p>
+                      <p>• Available memory: {lambdaConfig.memory} MB</p>
                     </div>
                   </div>
                 </TabsContent>
@@ -1155,7 +1263,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                     <div className="space-y-2">
                       <Label className="flex items-center gap-2">
                         <Globe className="h-4 w-4" />
-                        Trigger Principal
+                        Main Trigger
                       </Label>
                       <Select
                         value={lambdaConfig.trigger}
@@ -1177,24 +1285,24 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                     </div>
 
                     <div className="p-4 bg-yellow-50 rounded-lg">
-                      <h4 className="font-medium text-yellow-900 mb-2">Configuración del Trigger:</h4>
+                      <h4 className="font-medium text-yellow-900 mb-2">Trigger Configuration:</h4>
                       {lambdaConfig.trigger === "api-gateway" && (
                         <div className="text-sm text-yellow-800">
-                          <p>• Se creará un API Gateway REST</p>
+                          <p>• A REST API Gateway will be created</p>
                           <p>• Endpoint: https://api-id.execute-api.region.amazonaws.com/prod/</p>
-                          <p>• Métodos: GET, POST, PUT, DELETE</p>
+                          <p>• Methods: GET, POST, PUT, DELETE</p>
                         </div>
                       )}
                       {lambdaConfig.trigger === "s3" && (
                         <div className="text-sm text-yellow-800">
-                          <p>• Se ejecutará cuando se suban archivos al bucket</p>
-                          <p>• Eventos: s3:ObjectCreated:*</p>
+                          <p>• Will execute when files are uploaded to the bucket</p>
+                          <p>• Events: s3:ObjectCreated:*</p>
                         </div>
                       )}
                       {lambdaConfig.trigger === "sqs" && (
                         <div className="text-sm text-yellow-800">
-                          <p>• Se ejecutará cuando lleguen mensajes a la cola</p>
-                          <p>• Batch size: 10 mensajes</p>
+                          <p>• Will execute when messages arrive in the queue</p>
+                          <p>• Batch size: 10 messages</p>
                         </div>
                       )}
                     </div>
@@ -1253,6 +1361,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
             },
             docker_images: dockerImagesOrdenadas,
             service: "ecs",
+            domain_name: ecsConfig.domainName, // Add domain name to deployment data
           }
           break
 
@@ -1280,9 +1389,9 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
           break
       }
 
-      // Log detallado de los datos que se envían
-      console.log("🚀 Iniciando deployment con los siguientes datos:")
-      console.log("📋 Datos generales:", {
+      // Detailed log of the data being sent
+      console.log("🚀 Starting deployment with the following data:")
+      console.log("📋 General data:", {
         service: deploymentData.service,
         regions: deploymentData.regions,
         name: deploymentData.name
@@ -1298,21 +1407,21 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
         console.log("💾 Memory MB:", deploymentData.memory_mb)
       }
       
-      console.log("📦 Datos completos:", deploymentData)
+      console.log("📦 Complete data:", deploymentData)
 
-      toast.loading("Iniciando deployment...", { id: "deployment" })
+      toast.loading("Starting deployment...", { id: "deployment" })
 
       const response = await DeploymentProvider.createDeployment(deploymentData)
 
       if (response.success) {
-        toast.success(`Deployment iniciado exitosamente! ID: ${response.deploymentId}`, { id: "deployment" })
-        console.log("✅ Deployment creado exitosamente:", response)
+        toast.success(`Deployment started successfully! ID: ${response.deploymentId}`, { id: "deployment" })
+        console.log("✅ Deployment created successfully:", response)
       } else {
-        throw new Error(response.message || "Error desconocido")
+        throw new Error(response.message || "Unknown error")
       }
     } catch (error) {
-      console.error("❌ Error en el deployment:", error)
-      toast.error(`Error en el deployment: ${error instanceof Error ? error.message : "Error desconocido"}`, {
+      console.error("❌ Error in deployment:", error)
+      toast.error(`Error in deployment: ${error instanceof Error ? error.message : "Unknown error"}`, {
         id: "deployment",
       })
     } finally {
@@ -1320,14 +1429,25 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
     }
   }
 
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isLoading && !isAuthenticated) {
       router.replace("/sign-in");
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isLoading, router]);
+
+  if (isLoading) {
+    return (
+      <div className="h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-lg text-slate-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return null;
@@ -1341,7 +1461,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
             <Cloud className="h-14 w-14 text-blue-600" />
             Cloud Deployer
           </h1>
-          <p className="text-slate-700 text-2xl font-medium">Despliega tus aplicaciones Docker en la nube de forma sencilla</p>
+          <p className="text-slate-700 text-2xl font-medium">Deploy your Docker applications to the cloud easily</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1352,9 +1472,9 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Settings className="h-5 w-5" />
-                  Selecciona tu Servicio
+                  Select Your Service
                 </CardTitle>
-                <CardDescription>Elige el tipo de servicio que mejor se adapte a tu aplicación</CardDescription>
+                <CardDescription>Choose the service type that best fits your application</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1397,9 +1517,9 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Globe className="h-5 w-5" />
-                  Regiones
+                  Regions
                 </CardTitle>
-                <CardDescription>Selecciona las regiones donde desplegar</CardDescription>
+                <CardDescription>Select the regions where to deploy</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="relative">
@@ -1446,9 +1566,9 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                                   <Badge
                                     variant="secondary"
                                     className={`text-xs mt-1 ${
-                                      region.latency === "Baja"
+                                      region.latency === "Low"
                                         ? "bg-green-100 text-green-800"
-                                        : region.latency === "Media"
+                                        : region.latency === "Medium"
                                           ? "bg-yellow-100 text-yellow-800"
                                           : "bg-red-100 text-red-800"
                                     }`}
@@ -1474,7 +1594,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                     <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-sm font-medium text-blue-900">
-                          Seleccionadas ({selectedRegions.length}):
+                          Selected ({selectedRegions.length}):
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-1">
@@ -1498,17 +1618,17 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Database className="h-5 w-5" />
-                  Resumen de Configuración
+                  Configuration Summary
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600">Servicio:</span>
+                    <span className="text-sm text-slate-600">Service:</span>
                     <Badge>{services.find((s) => s.id === selectedService)?.name}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-slate-600">Regiones:</span>
+                    <span className="text-sm text-slate-600">Regions:</span>
                     <Badge variant="outline">{selectedRegions.length}</Badge>
                   </div>
 
@@ -1521,7 +1641,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                         </Badge>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-slate-600">Instancia:</span>
+                        <span className="text-sm text-slate-600">Instance:</span>
                         <Badge variant="secondary">{ec2Config.instanceType}</Badge>
                       </div>
                       <div className="flex justify-between items-center">
@@ -1540,11 +1660,11 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                         <Badge variant="secondary">{ecsConfig.taskCpu / 1024} vCPU</Badge>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-slate-600">Memoria:</span>
+                        <span className="text-sm text-slate-600">Memory:</span>
                         <Badge variant="secondary">{ecsConfig.taskMemory} MB</Badge>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-slate-600">Tareas:</span>
+                        <span className="text-sm text-slate-600">Tasks:</span>
                         <Badge variant="secondary">{ecsConfig.desiredCount}</Badge>
                       </div>
                     </>
@@ -1559,7 +1679,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                         </Badge>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-sm text-slate-600">Memoria:</span>
+                        <span className="text-sm text-slate-600">Memory:</span>
                         <Badge variant="secondary">{lambdaConfig.memory} MB</Badge>
                       </div>
                       <div className="flex justify-between items-center">
@@ -1571,7 +1691,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
 
                   {(selectedService === "ec2" || selectedService === "ecs") && (
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-600">Imágenes:</span>
+                      <span className="text-sm text-slate-600">Images:</span>
                       <Badge variant="secondary">{dockerImages.filter((img) => img.name).length}</Badge>
                     </div>
                   )}
@@ -1584,26 +1704,26 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <DollarSign className="h-5 w-5" />
-                  Estimación de Costos
+                  Cost Estimation
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-center space-y-2">
                   <div className="text-3xl font-bold text-green-600">${calculateCost()}</div>
                   <p className="text-sm text-slate-600">
-                    {selectedService === "lambda" ? "por 1M invocaciones" : "por mes (estimado)"}
+                    {selectedService === "lambda" ? "per 1M invocations" : "per month (estimated)"}
                   </p>
                 </div>
 
                 <Separator className="my-4" />
 
                 <div className="space-y-2 text-xs text-slate-500">
-                  <p>• Precios pueden variar según la región</p>
-                  {selectedService !== "lambda" && <p>• No incluye transferencia de datos</p>}
+                  <p>• Prices may vary by region</p>
+                  {selectedService !== "lambda" && <p>• Does not include data transfer</p>}
                   {selectedService === "lambda" ? (
-                    <p>• Incluye 1M requests + compute time</p>
+                    <p>• Includes 1M requests + compute time</p>
                   ) : (
-                    <p>• Facturación por hora de uso</p>
+                    <p>• Billed by hour of use</p>
                   )}
                 </div>
               </CardContent>
@@ -1627,18 +1747,18 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                   {isDeploying ? (
                     <>
                       <Loader2 className="h-5 w-5 mr-2 animate-spin" />
-                      Desplegando...
+                      Deploying...
                     </>
                   ) : (
                     <>
                       <Play className="h-5 w-5 mr-2" />
-                      Desplegar {services.find((s) => s.id === selectedService)?.name}
+                      Deploy {services.find((s) => s.id === selectedService)?.name}
                     </>
                   )}
                 </Button>
 
                 <p className="text-xs text-center text-slate-500 mt-3">
-                  El despliegue tomará aproximadamente {selectedService === "lambda" ? "1-2" : "3-8"} minutos
+                  Deployment will take approximately {selectedService === "lambda" ? "1-2" : "3-8"} minutes
                 </p>
               </CardContent>
             </Card>
