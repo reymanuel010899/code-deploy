@@ -9,12 +9,18 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Server, Network, Shield, HardDrive } from "lucide-react"
+import { Server, Network, Shield, HardDrive, Trash2, Plus } from "lucide-react"
 import { OPERATING_SYSTEMS } from "@/constants"
 import { useDeploymentStore } from "@/store/useDeploymentStore"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "components/ui/dialog"
+import { useState } from "react"
+import { ServiceDeploymentHistory } from "../common/ServiceDeploymentHistory"
+import { Button } from "@/components/ui/button"
 
 export function EC2Configuration() {
-  const { ec2Config, setEC2Config } = useDeploymentStore()
+  const { ec2Config, setEC2Config, dockerImages, updateDockerImage, addDockerImage, removeDockerImage } = useDeploymentStore()
+  const [modalImageId, setModalImageId] = useState<string | null>(null)
+  const [modalType, setModalType] = useState<"update" | "replace" | null>(null)
 
   return (
     <Card className="animate-fade-in">
@@ -200,6 +206,106 @@ export function EC2Configuration() {
             </div>
           </TabsContent>
         </Tabs>
+        {/* Bloque de imágenes Docker */}
+        <div className="my-6">
+          <h4 className="font-medium flex items-center gap-2">Imágenes Docker</h4>
+          {dockerImages.map((image, index) => (
+            <div key={image.id} className="flex gap-2 items-end mb-2 flex-wrap">
+              <div className="flex-1 min-w-[120px] space-y-2">
+                <Label>Imagen {index + 1}</Label>
+                <Input
+                  className="h-9 text-sm"
+                  placeholder="nginx, node:18, postgres:15"
+                  value={image.name}
+                  onChange={(e) => updateDockerImage(image.id, "name", e.target.value)}
+                />
+              </div>
+              <div className="w-20 min-w-[80px] space-y-2">
+                <Label>Tag</Label>
+                <Input
+                  className="h-9 text-sm"
+                  placeholder="latest"
+                  value={image.tag}
+                  onChange={(e) => updateDockerImage(image.id, "tag", e.target.value)}
+                />
+              </div>
+              <div className="w-20 min-w-[80px] space-y-2">
+                <Label>Puerto</Label>
+                <Input
+                  className="h-9 text-sm"
+                  placeholder="80"
+                  value={image.port || ""}
+                  onChange={(e) => updateDockerImage(image.id, "port", e.target.value)}
+                />
+              </div>
+              <div className="w-20 min-w-[80px] space-y-2">
+                <Label>CPU</Label>
+                <Input
+                  className="h-9 text-sm"
+                  placeholder="256"
+                  value={image.cpu || ""}
+                  onChange={(e) => updateDockerImage(image.id, "cpu", e.target.value)}
+                />
+              </div>
+              <div className="w-20 min-w-[80px] space-y-2">
+                <Label>Memoria</Label>
+                <Input
+                  className="h-9 text-sm"
+                  placeholder="512"
+                  value={image.memory || ""}
+                  onChange={(e) => updateDockerImage(image.id, "memory", e.target.value)}
+                />
+              </div>
+              {/* Nuevo switch para actualizar/reemplazar imagen */}
+              <div className="flex items-center mb-2">
+                <Switch
+                  checked={modalImageId === image.id}
+                  onCheckedChange={(checked) => checked ? setModalImageId(image.id) : setModalImageId(null)}
+                />
+              </div>
+              {dockerImages.length > 1 && (
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => removeDockerImage(image.id)}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          ))}
+          {dockerImages.length < 3 && (
+            <Button
+              variant="outline"
+              onClick={addDockerImage}
+              className="w-full border-dashed border-2 hover:bg-muted/50"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Agregar Imagen Docker
+            </Button>
+          )}
+          {/* Modal para actualizar/reemplazar imagen */}
+          <Dialog open={!!modalImageId} onOpenChange={(open) => !open && setModalImageId(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>¿Qué deseas hacer con la imagen?</DialogTitle>
+                <DialogDescription>
+                  Puedes actualizar la imagen (pull del mismo tag) o reemplazarla por una nueva.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex gap-4 mt-4">
+                <Button onClick={() => { setModalType("update"); setModalImageId(null); }}>Actualizar</Button>
+                <Button variant="outline" onClick={() => { setModalType("replace"); setModalImageId(null); }}>Reemplazar</Button>
+                <DialogClose asChild>
+                  <Button variant="ghost">Cancelar</Button>
+                </DialogClose>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+        {/* Historial de deployments por servicio */}
+        <ServiceDeploymentHistory />
       </CardContent>
     </Card>
   )

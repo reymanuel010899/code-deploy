@@ -2,6 +2,9 @@ export interface DockerImage {
   id: string
   name: string
   tag: string
+  port?: string
+  cpu?: string
+  memory?: string
 }
 
 export interface EC2Config {

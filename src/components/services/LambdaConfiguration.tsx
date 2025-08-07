@@ -12,9 +12,14 @@ import { Switch } from "@/components/ui/switch"
 import { Zap, Code, Timer, Globe } from "lucide-react"
 import { RUNTIMES } from "@/constants"
 import { useDeploymentStore } from "@/store/useDeploymentStore"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "components/ui/dialog"
+import { useState } from "react"
+import { ServiceDeploymentHistory } from "../common/ServiceDeploymentHistory"
 
 export function LambdaConfiguration() {
   const { lambdaConfig, setLambdaConfig } = useDeploymentStore()
+  const [modalImageId, setModalImageId] = useState<string | null>(null)
+  const [modalType, setModalType] = useState<"update" | "replace" | null>(null)
 
   return (
     <Card className="animate-fade-in">
@@ -179,6 +184,8 @@ export function LambdaConfiguration() {
             </div>
           </TabsContent>
         </Tabs>
+        {/* Historial de deployments por servicio */}
+        <ServiceDeploymentHistory />
       </CardContent>
     </Card>
   )
