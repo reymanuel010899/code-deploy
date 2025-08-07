@@ -10,7 +10,9 @@ phases:
       nodejs: 18
     commands:
       - echo "Installing dependencies..."
+      - echo "Installing dependencies...."
       - npm install --legacy-peer-deps
+
   build:
     commands:
       - echo "Building the Next.js app..."
