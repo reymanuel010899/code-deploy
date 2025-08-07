@@ -12,7 +12,3 @@ phases:
       - echo "Building the app"
       - npm run build
 
-artifacts:
-  files:
-    - '**/*'
-  base-directory: frontend/build
