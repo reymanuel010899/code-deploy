@@ -15,7 +15,7 @@ phases:
     commands:
       - echo "Building the Next.js app..."
       - npm run build --if-present
-      - npm run export --if-present
+
   artifacts:
     files:
       - '**/*'
