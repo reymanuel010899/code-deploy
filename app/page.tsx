@@ -42,6 +42,7 @@ import type { DeploymentRequest, DeploymentResponse } from "@/types/api"
 import { useDeployment } from "@/hooks/useDeployment"
 import { createDockerImages } from "../src/providers/images"
 import { ServiceDeploymentHistory } from "../src/components/common/ServiceDeploymentHistory"
+import { CodeEditor } from "../src/components/common/CodeEditor"
 import { useAuth } from "@/providers/auth/AuthProvider";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -110,6 +111,14 @@ interface ECSConfig {
   memoryHardLimit?: number
 }
 
+interface CodeFile {
+  id: string
+  name: string
+  content: string
+  language: string
+  isMain?: boolean
+}
+
 interface LambdaConfig {
   runtime: string
   handler: string
@@ -118,6 +127,7 @@ interface LambdaConfig {
   environmentVars: string
   trigger: string
   deadLetterQueue: boolean
+  codeFiles: CodeFile[]
 }
 
 
@@ -181,12 +191,57 @@ export default function CloudInterface() {
 
   const [lambdaConfig, setLambdaConfig] = useState<LambdaConfig>({
     runtime: "nodejs18.x",
-    handler: "index.handler",
+    handler: "index.handle_funcion",
     timeout: 30,
     memory: 128,
     environmentVars: "",
     trigger: "api-gateway",
     deadLetterQueue: false,
+    codeFiles: [
+      {
+        id: "main",
+        name: "index.js",
+        content: `// Función principal de Lambda
+exports.handle_funcion = async (event, context) => {
+    console.log('Event:', JSON.stringify(event, null, 2));
+    console.log('Context:', JSON.stringify(context, null, 2));
+    
+    try {
+        // Tu lógica de negocio aquí
+        const response = {
+            statusCode: 200,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            body: JSON.stringify({
+                message: 'Hello from Lambda!',
+                requestId: context.awsRequestId,
+                timestamp: new Date().toISOString(),
+                input: event
+            })
+        };
+        
+        return response;
+    } catch (error) {
+        console.error('Error:', error);
+        return {
+            statusCode: 500,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            },
+            body: JSON.stringify({
+                error: 'Internal server error',
+                message: error.message
+            })
+        };
+    }
+};`,
+        language: "javascript",
+        isMain: true
+      }
+    ],
   })
 
   const [isDeploying, setIsDeploying] = useState(false)
@@ -1145,8 +1200,9 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="runtime" className="w-full">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="runtime">Runtime</TabsTrigger>
+                  <TabsTrigger value="code">Código</TabsTrigger>
                   <TabsTrigger value="config">Configuration</TabsTrigger>
                   <TabsTrigger value="triggers">Triggers</TabsTrigger>
                 </TabsList>
@@ -1194,14 +1250,13 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                       onChange={(e) => setLambdaConfig({ ...lambdaConfig, environmentVars: e.target.value })}
                       rows={4}
                     />
-                    <Editor
-                        height="500px"
-                        defaultLanguage="python"
-                        defaultValue="// Escribe tu código aquí"
-                        theme="vs-dark"  
-                      />
-                    {/* <p className="text-xs text-slate-500">One variable per line in KEY=value format</p> */}
+                    <p className="text-xs text-slate-500">Una variable por línea en formato CLAVE=valor</p>
                   </div>
+                </TabsContent>
+
+                <TabsContent value="code" className="space-y-6 mt-6">
+                  {/* Editor de código multi-archivo */}
+                  <CodeEditor />
                 </TabsContent>
 
                 <TabsContent value="config" className="space-y-6 mt-6">
@@ -1385,6 +1440,12 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
             environment_vars: lambdaConfig.environmentVars,
             trigger: lambdaConfig.trigger,
             dead_letter_queue: lambdaConfig.deadLetterQueue,
+            code_files: lambdaConfig.codeFiles.map((file: CodeFile) => ({
+              name: file.name,
+              content: file.content,
+              language: file.language,
+              isMain: file.isMain
+            }))
           }
           break
       }
