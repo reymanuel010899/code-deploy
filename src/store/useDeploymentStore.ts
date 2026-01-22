@@ -1,6 +1,6 @@
 import { create } from "zustand"
 import { persist } from "zustand/middleware"
-import type { DeploymentConfig, DockerImage, EC2Config, ECSConfig, LambdaConfig, ServiceType } from "@/types"
+import type { DeploymentConfig, DockerImage, EC2Config, ECSConfig, LambdaConfig, ServiceType, CodeFile } from "@/types"
 
 interface DeploymentStore extends DeploymentConfig {
   // Actions
@@ -14,6 +14,10 @@ interface DeploymentStore extends DeploymentConfig {
   setEC2Config: (config: Partial<EC2Config>) => void
   setECSConfig: (config: Partial<ECSConfig>) => void
   setLambdaConfig: (config: Partial<LambdaConfig>) => void
+  addCodeFile: () => void
+  removeCodeFile: (id: string) => void
+  updateCodeFile: (id: string, field: keyof CodeFile, value: string | boolean) => void
+  setActiveCodeFile: (id: string) => void
   resetConfig: () => void
   saveTemplate: (name: string) => void
   loadTemplate: (name: string) => void
@@ -82,6 +86,29 @@ const initialState: DeploymentConfig = {
     environmentVars: "",
     trigger: "api-gateway",
     deadLetterQueue: false,
+    codeFiles: [
+      {
+        id: "main",
+        name: "index.js",
+        content: `// Función principal de Lambda
+exports.handler = async (event) => {
+    // Tu código aquí
+    console.log('Event:', JSON.stringify(event, null, 2));
+    
+    const response = {
+        statusCode: 200,
+        body: JSON.stringify({
+            message: 'Hello from Lambda!',
+            input: event,
+        }),
+    };
+    
+    return response;
+};`,
+        language: "javascript",
+        isMain: true
+      }
+    ],
   },
 }
 
@@ -148,6 +175,65 @@ export const useDeploymentStore = create<DeploymentStore>()(
         set((state) => ({
           lambdaConfig: { ...state.lambdaConfig, ...config },
         })),
+
+      addCodeFile: () =>
+        set((state) => {
+          const newFileId = Date.now().toString()
+          const fileExtension = state.lambdaConfig.runtime.includes('nodejs') ? 'js' :
+                                state.lambdaConfig.runtime.includes('python') ? 'py' :
+                                state.lambdaConfig.runtime.includes('java') ? 'java' :
+                                state.lambdaConfig.runtime.includes('dotnet') ? 'cs' :
+                                state.lambdaConfig.runtime.includes('go') ? 'go' :
+                                state.lambdaConfig.runtime.includes('ruby') ? 'rb' : 'txt'
+          
+          const language = state.lambdaConfig.runtime.includes('nodejs') ? 'javascript' :
+                          state.lambdaConfig.runtime.includes('python') ? 'python' :
+                          state.lambdaConfig.runtime.includes('java') ? 'java' :
+                          state.lambdaConfig.runtime.includes('dotnet') ? 'csharp' :
+                          state.lambdaConfig.runtime.includes('go') ? 'go' :
+                          state.lambdaConfig.runtime.includes('ruby') ? 'ruby' : 'plaintext'
+
+          const newFile: CodeFile = {
+            id: newFileId,
+            name: `module${state.lambdaConfig.codeFiles.length}.${fileExtension}`,
+            content: `// Nuevo módulo
+// Agrega tu código aquí`,
+            language,
+            isMain: false
+          }
+
+          return {
+            lambdaConfig: {
+              ...state.lambdaConfig,
+              codeFiles: [...state.lambdaConfig.codeFiles, newFile]
+            }
+          }
+        }),
+
+      removeCodeFile: (id) =>
+        set((state) => ({
+          lambdaConfig: {
+            ...state.lambdaConfig,
+            codeFiles: state.lambdaConfig.codeFiles.length > 1 ? 
+              state.lambdaConfig.codeFiles.filter((file) => file.id !== id && !file.isMain) : 
+              state.lambdaConfig.codeFiles
+          }
+        })),
+
+      updateCodeFile: (id, field, value) =>
+        set((state) => ({
+          lambdaConfig: {
+            ...state.lambdaConfig,
+            codeFiles: state.lambdaConfig.codeFiles.map((file) => 
+              file.id === id ? { ...file, [field]: value } : file
+            )
+          }
+        })),
+
+      setActiveCodeFile: (id) => {
+        // Esta acción puede ser usada por el componente para cambiar el archivo activo
+        // Por ahora no necesitamos persistir el estado activo en el store
+      },
 
       resetConfig: () => set(initialState),
 
