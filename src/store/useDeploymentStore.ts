@@ -80,7 +80,7 @@ const initialState: DeploymentConfig = {
   },
   lambdaConfig: {
     runtime: "nodejs18.x",
-    handler: "index.handle_funcion",
+    handler: "index.handler",
     timeout: 30,
     memory: 128,
     environmentVars: "",
@@ -91,41 +91,19 @@ const initialState: DeploymentConfig = {
         id: "main",
         name: "index.js",
         content: `// Función principal de Lambda
-exports.handle_funcion = async (event, context) => {
+exports.handler = async (event) => {
+    // Tu código aquí
     console.log('Event:', JSON.stringify(event, null, 2));
-    console.log('Context:', JSON.stringify(context, null, 2));
     
-    try {
-        // Tu lógica de negocio aquí
-        const response = {
-            statusCode: 200,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            body: JSON.stringify({
-                message: 'Hello from Lambda!',
-                requestId: context.awsRequestId,
-                timestamp: new Date().toISOString(),
-                input: event
-            })
-        };
-        
-        return response;
-    } catch (error) {
-        console.error('Error:', error);
-        return {
-            statusCode: 500,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
-            body: JSON.stringify({
-                error: 'Internal server error',
-                message: error.message
-            })
-        };
-    }
+    const response = {
+        statusCode: 200,
+        body: JSON.stringify({
+            message: 'Hello from Lambda!',
+            input: event,
+        }),
+    };
+    
+    return response;
 };`,
         language: "javascript",
         isMain: true
@@ -215,10 +193,9 @@ export const useDeploymentStore = create<DeploymentStore>()(
                           state.lambdaConfig.runtime.includes('go') ? 'go' :
                           state.lambdaConfig.runtime.includes('ruby') ? 'ruby' : 'plaintext'
 
-          const codeFiles = state.lambdaConfig.codeFiles || []
           const newFile: CodeFile = {
             id: newFileId,
-            name: `module${codeFiles.length}.${fileExtension}`,
+            name: `module${state.lambdaConfig.codeFiles.length}.${fileExtension}`,
             content: `// Nuevo módulo
 // Agrega tu código aquí`,
             language,
@@ -228,36 +205,30 @@ export const useDeploymentStore = create<DeploymentStore>()(
           return {
             lambdaConfig: {
               ...state.lambdaConfig,
-              codeFiles: [...codeFiles, newFile]
+              codeFiles: [...state.lambdaConfig.codeFiles, newFile]
             }
           }
         }),
 
       removeCodeFile: (id) =>
-        set((state) => {
-          const codeFiles = state.lambdaConfig.codeFiles || []
-          return {
-            lambdaConfig: {
-              ...state.lambdaConfig,
-              codeFiles: codeFiles.length > 1 ? 
-                codeFiles.filter((file) => file.id !== id && !file.isMain) : 
-                codeFiles
-            }
+        set((state) => ({
+          lambdaConfig: {
+            ...state.lambdaConfig,
+            codeFiles: state.lambdaConfig.codeFiles.length > 1 ? 
+              state.lambdaConfig.codeFiles.filter((file) => file.id !== id && !file.isMain) : 
+              state.lambdaConfig.codeFiles
           }
-        }),
+        })),
 
       updateCodeFile: (id, field, value) =>
-        set((state) => {
-          const codeFiles = state.lambdaConfig.codeFiles || []
-          return {
-            lambdaConfig: {
-              ...state.lambdaConfig,
-              codeFiles: codeFiles.map((file) => 
-                file.id === id ? { ...file, [field]: value } : file
-              )
-            }
+        set((state) => ({
+          lambdaConfig: {
+            ...state.lambdaConfig,
+            codeFiles: state.lambdaConfig.codeFiles.map((file) => 
+              file.id === id ? { ...file, [field]: value } : file
+            )
           }
-        }),
+        })),
 
       setActiveCodeFile: (id) => {
         // Esta acción puede ser usada por el componente para cambiar el archivo activo
