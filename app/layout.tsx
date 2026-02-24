@@ -2,9 +2,9 @@ import { AuthProvider } from "@/providers/auth/AuthProvider";
 import './globals.css'
 
 export const metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
-  generator: 'v0.dev',
+  title: 'Clouder',
+  description: 'Created with Clouder',
+  generator: 'Clouder',
 }
 
 export default function RootLayout({
