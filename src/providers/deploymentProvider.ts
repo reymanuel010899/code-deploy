@@ -263,8 +263,9 @@ export class DeploymentProvider {
    */
   static async fetchDeploymentsFromLocalApi(): Promise<any[]> {
     try {
-      const response = apiClient.get("/deployments/")
-      return response.deployments || []
+      const response = await apiClient.get("/deployments/")
+      return response
+      
     } catch (error) {
       console.error("Error fetching deployments from local API:", error)
       throw error

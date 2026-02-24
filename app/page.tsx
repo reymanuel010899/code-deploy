@@ -243,7 +243,20 @@ exports.handle_funcion = async (event, context) => {
       }
     ],
   })
-
+  const database_engines = [
+    "POSTGRES",
+    "MYSQL",
+    "MARIADB",
+    "ORACLE-SE2",
+    "ORACLE-EE",         
+    "SQLSERVER-EE",     
+    "SQLSERVER-SE",     
+    "SQLSERVER-EX",      
+    "SQLSERVER-WEB",    
+    "AURORA",            
+    "AURORA-MYSQL",     
+    "AURORA-POSTGRESQL"  
+]
   const [isDeploying, setIsDeploying] = useState(false)
   const [isCheckingDomain, setIsCheckingDomain] = useState(false)
   const [domainAvailability, setDomainAvailability] = useState<{
@@ -342,7 +355,7 @@ exports.handle_funcion = async (event, context) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ domain: domain.trim(), tld: "com"  }) // You can change the TLD as needed,
+        body: JSON.stringify({ domain: domain.trim(), tld: "com" }) // You can change the TLD as needed,
       })
       console.log('Domain check response:', response)
       if (response) {
@@ -590,7 +603,7 @@ exports.handle_funcion = async (event, context) => {
 
                 <TabsContent value="cluster" className="space-y-6 mt-6">
                   <div className="space-y-4">
-                   
+
 
                     <div className="space-y-2">
                       <Label>Domain Name</Label>
@@ -614,11 +627,10 @@ exports.handle_funcion = async (event, context) => {
                         )}
                       </div>
                       {domainAvailability && (
-                        <div className={`mt-2 p-2 rounded-md text-sm ${
-                          domainAvailability.available 
-                            ? 'bg-green-50 text-green-800 border border-green-200' 
+                        <div className={`mt-2 p-2 rounded-md text-sm ${domainAvailability.available
+                            ? 'bg-green-50 text-green-800 border border-green-200'
                             : 'bg-red-50 text-red-800 border border-red-200'
-                        }`}>
+                          }`}>
                           <div className="flex items-center gap-2">
                             {domainAvailability.available ? (
                               <span className="text-green-600">✓</span>
@@ -765,14 +777,41 @@ exports.handle_funcion = async (event, context) => {
                       )}
                       {dockerImages.map((image, index) => (
                         <div key={image.id} className="flex gap-3 items-end flex-wrap">
-                          <div className="flex-1 min-w-[120px] space-y-2">
-                            <Label>Image {index + 1}</Label>
-                            <Input
+                          
+                            <div className="flex-1 min-w-[120px] space-y-2">
+                            <Label>
+                              {index === 0
+                              ? "Backend container"
+                              : index === 1
+                              ? "Frontend container"
+                              : "Database container"}
+                            </Label>
+                            {index === dockerImages.length - 1 ? (
+                              <div>
+                              <Select
+                                onValueChange={(value) => updateDockerImage(image.id, "name", value)}
+                                value={image.name}
+                              >
+                                <SelectTrigger>
+                                <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                {database_engines.map((engine) => (
+                                  <SelectItem key={engine} value={engine}>
+                                  {engine}
+                                  </SelectItem>
+                                ))}
+                                </SelectContent>
+                              </Select>
+                              </div>
+                            ) : (
+                              <Input
                               placeholder="nginx, node:18, postgres:15"
                               value={image.name}
                               onChange={(e) => updateDockerImage(image.id, "name", e.target.value)}
-                            />
-                          </div>
+                              />
+                            )}
+                            </div>
                           <div className="flex-1 min-w-[80px] space-y-2">
                             <Label>Port</Label>
                             <Input
@@ -802,7 +841,7 @@ exports.handle_funcion = async (event, context) => {
                               <SelectContent>
                                 {ECS_CPU_OPTIONS.map(opt => (
                                   <SelectItem key={opt} value={opt.toString()}>
-                                    {opt} {opt < 1024 ? `(0.${opt/1024} vCPU)` : `(${opt/1024} vCPU)`}
+                                    {opt} {opt < 1024 ? `(0.${opt / 1024} vCPU)` : `(${opt / 1024} vCPU)`}
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -850,6 +889,7 @@ exports.handle_funcion = async (event, context) => {
                       )}
 
                       {/* Nueva sección: Credenciales de Base de Datos */}
+                      {dockerImages.length >= 3 && (
                       <div className="mt-8 p-4 bg-slate-50 rounded-lg border border-slate-200">
                         <h4 className="font-medium mb-4 flex items-center gap-2">
                           <Database className="h-5 w-5" />
@@ -863,7 +903,7 @@ exports.handle_funcion = async (event, context) => {
                               placeholder="your-secure-password"
                               type="password"
                               value={databaseCredentials.rootPassword}
-                              onChange={(e) => setDatabaseCredentials({...databaseCredentials, rootPassword: e.target.value})}
+                              onChange={(e) => setDatabaseCredentials({ ...databaseCredentials, rootPassword: e.target.value })}
                             />
                           </div>
                           <div>
@@ -872,7 +912,7 @@ exports.handle_funcion = async (event, context) => {
                               id="mysql-database"
                               placeholder="database"
                               value={databaseCredentials.databaseName}
-                              onChange={(e) => setDatabaseCredentials({...databaseCredentials, databaseName: e.target.value})}
+                              onChange={(e) => setDatabaseCredentials({ ...databaseCredentials, databaseName: e.target.value })}
                             />
                           </div>
                           <div>
@@ -881,7 +921,7 @@ exports.handle_funcion = async (event, context) => {
                               id="mysql-user"
                               placeholder="user"
                               value={databaseCredentials.databaseUser}
-                              onChange={(e) => setDatabaseCredentials({...databaseCredentials, databaseUser: e.target.value})}
+                              onChange={(e) => setDatabaseCredentials({ ...databaseCredentials, databaseUser: e.target.value })}
                             />
                           </div>
                           <div>
@@ -891,7 +931,7 @@ exports.handle_funcion = async (event, context) => {
                               placeholder="user-password"
                               type="password"
                               value={databaseCredentials.databasePassword}
-                              onChange={(e) => setDatabaseCredentials({...databaseCredentials, databasePassword: e.target.value})}
+                              onChange={(e) => setDatabaseCredentials({ ...databaseCredentials, databasePassword: e.target.value })}
                             />
                           </div>
                           <div>
@@ -901,7 +941,7 @@ exports.handle_funcion = async (event, context) => {
                               placeholder="3306"
                               type="number"
                               value={databaseCredentials.mysqlPort}
-                              onChange={(e) => setDatabaseCredentials({...databaseCredentials, mysqlPort: e.target.value})}
+                              onChange={(e) => setDatabaseCredentials({ ...databaseCredentials, mysqlPort: e.target.value })}
                             />
                           </div>
                         </div>
@@ -923,6 +963,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                           </pre>
                         </div>
                       </div>
+                      )}
 
                       {(() => {
                         const totalCpu = dockerImages.reduce((sum, img) => sum + (Number(img.cpu) || 0), 0)
@@ -1386,7 +1427,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
 
   const handleDeploy = async () => {
     setIsDeploying(true)
-    
+
     try {
       // Ordenar las imágenes antes de enviarlas
       const dockerImagesOrdenadas = ordenarDockerImages(dockerImages);
@@ -1457,7 +1498,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
         regions: deploymentData.regions,
         name: deploymentData.name
       })
-      
+
       if (deploymentData.docker_image) {
         console.log("🐳 Docker Images:", deploymentData.docker_image)
       }
@@ -1467,7 +1508,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
       if (deploymentData.memory_mb) {
         console.log("💾 Memory MB:", deploymentData.memory_mb)
       }
-      
+
       console.log("📦 Complete data:", deploymentData)
 
       toast.loading("Starting deployment...", { id: "deployment" })
@@ -1516,10 +1557,10 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
 
   return (
     <div className="h-screen w-full bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-      <div className="h-[90vh] w-[90vw] mx-auto my-auto rounded-2xl shadow-2xl bg-white/80 p-10 space-y-8 overflow-auto" style={{fontSize: '1.15rem', fontFamily: 'Inter, sans-serif'}}>
-        <div className="text-center space-y-3">
-          <h1 className="text-6xl font-extrabold text-slate-800 flex items-center justify-center gap-4 tracking-tight drop-shadow-lg">
-            <Cloud className="h-14 w-14 text-blue-600" />
+      <div className="h-[98vh] w-[98vw] mx-auto my-auto rounded-2xl shadow-2xl bg-white/80 p-5 space-y-5 overflow-auto" style={{ fontSize: '1.15rem', fontFamily: 'Inter, sans-serif' }}>
+        <div className="text-center space-y-1">
+          <h1 className="text-3xl font-extrabold text-slate-800 flex items-center justify-center gap-4 tracking-tight drop-shadow-lg">
+            <Cloud className="h-10 w-14 text-blue-600" />
             Cloud Deployer
           </h1>
           <p className="text-slate-700 text-2xl font-medium">Deploy your Docker applications to the cloud easily</p>
@@ -1544,9 +1585,8 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                     return (
                       <Card
                         key={service.id}
-                        className={`cursor-pointer transition-all hover:shadow-md ${
-                          selectedService === service.id ? "ring-2 ring-blue-500 bg-blue-50" : "hover:bg-slate-50"
-                        }`}
+                        className={`cursor-pointer transition-all hover:shadow-md ${selectedService === service.id ? "ring-2 ring-blue-500 bg-blue-50" : "hover:bg-slate-50"
+                          }`}
                         onClick={() => setSelectedService(service.id)}
                       >
                         <CardContent className="p-4 text-center space-y-3">
@@ -1572,11 +1612,11 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
           </div>
 
           {/* Summary Panel */}
-          <div className="space-y-6">
+          <div className="space-y-6 sticky top-0 text-sm">
             {/* Region Selection Carousel */}
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-1">
                   <Globe className="h-5 w-5" />
                   Regions
                 </CardTitle>
@@ -1594,9 +1634,8 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                       {Array.from({ length: Math.ceil(awsRegions.length / 2) }).map((_, index) => (
                         <div
                           key={index}
-                          className={`w-2 h-2 rounded-full ${
-                            index === currentRegionIndex ? "bg-blue-500" : "bg-gray-300"
-                          }`}
+                          className={`w-2 h-2 rounded-full ${index === currentRegionIndex ? "bg-blue-500" : "bg-gray-300"
+                            }`}
                         />
                       ))}
                     </div>
@@ -1613,12 +1652,11 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                       return (
                         <Card
                           key={region.id}
-                          className={`cursor-pointer transition-all hover:shadow-md ${
-                            isSelected ? "ring-2 ring-blue-500 bg-blue-50 shadow-md" : "hover:bg-slate-50"
-                          }`}
+                          className={`cursor-pointer transition-all hover:shadow-md ${isSelected ? "ring-2 ring-blue-500 bg-blue-50 shadow-md" : "hover:bg-slate-50"
+                            }`}
                           onClick={() => toggleRegion(region.id)}
                         >
-                          <CardContent className="p-3">
+                          <CardContent className="p-1">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
                                 <span className="text-xl">{region.flag}</span>
@@ -1626,13 +1664,12 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                                   <h4 className="font-medium text-sm">{region.name}</h4>
                                   <Badge
                                     variant="secondary"
-                                    className={`text-xs mt-1 ${
-                                      region.latency === "Low"
+                                    className={`text-xs mt-1 ${region.latency === "Low"
                                         ? "bg-green-100 text-green-800"
                                         : region.latency === "Medium"
                                           ? "bg-yellow-100 text-yellow-800"
                                           : "bg-red-100 text-red-800"
-                                    }`}
+                                      }`}
                                   >
                                     {region.latency}
                                   </Badge>
@@ -1652,7 +1689,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
 
                   {/* Selected Regions Summary */}
                   {selectedRegions.length > 0 && (
-                    <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                    <div className="mt-2 p-1 bg-blue-50 rounded-lg">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-sm font-medium text-blue-900">
                           Selected ({selectedRegions.length}):
