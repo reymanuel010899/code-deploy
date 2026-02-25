@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useDeploymentStore } from "@/store/useDeploymentStore";
 import { DeploymentProvider } from "@/providers/deploymentProvider";
-import { History, RefreshCw } from "lucide-react";
+import { History, RefreshCw, ExternalLink } from "lucide-react";
 
 export function ServiceDeploymentHistory() {
   const { service, setService, setRegions, setDockerImages, setEC2Config, setECSConfig, setLambdaConfig } = useDeploymentStore();
@@ -99,37 +99,27 @@ export function ServiceDeploymentHistory() {
               </div>
             ) : (
               <div className="w-full">
-                <div className="grid grid-cols-4 gap-4 font-medium text-sm border-b pb-2 text-center">
+                <div className="grid grid-cols-5 gap-4 font-medium text-sm border-b pb-2 text-center">
                   <span>Deployment</span>
                   <span>Status</span>
                   <span>Created At</span>
+                  <span>Open</span>
                   <span>Actions</span>
                 </div>
                 <div className="space-y-2">
                   {filtered.map((deployment) => (
                     <div
                       key={deployment.id || deployment.deploymentId}
-                      className="grid grid-cols-4 gap-4 items-center border-b py-2 cursor-pointer hover:bg-blue-50 transition text-center"
+                      className="grid grid-cols-5 gap-4 items-center border-b py-2 cursor-pointer hover:bg-blue-50 transition text-center"
                       onClick={() => handleSelectDeployment(deployment)}
                     >
                       <div>
-                        {deployment.deploymet_url ? (
-                          <a
-                            href={`${deployment.deploymet_url}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-500 underline text-sm"
-                          >
-                            {deployment.deploymet_url}
-                          </a>
-                        ) : (
-                          <span className="text-sm font-medium">
-                            {deployment.name ||
-                              `${deployment.service?.toUpperCase?.()}-${(deployment.id || deployment.deploymentId)
-                                ?.toString()
-                                .slice(0, 8)}`}
-                          </span>
-                        )}
+                        <span className="text-sm font-medium">
+                          {deployment.name ||
+                            `${deployment.service?.toUpperCase?.()}-${(deployment.id || deployment.deploymentId)
+                              ?.toString()
+                              .slice(0, 8)}`}
+                        </span>
                       </div>
                       <div>
                         <Badge
@@ -148,6 +138,23 @@ export function ServiceDeploymentHistory() {
                         <span className="text-xs text-muted-foreground">
                           {new Date(deployment.created_at || deployment.createdAt).toLocaleString()}
                         </span>
+                      </div>
+                      <div className="flex items-center justify-center">
+                        {deployment.deploymet_url ? (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              window.open(deployment.deploymet_url, "_blank", "noopener,noreferrer");
+                            }}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-slate-400">—</span>
+                        )}
                       </div>
                       <div className="flex items-center justify-center gap-4">
                         <Button

@@ -35,6 +35,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Loader2,
+  Power,
 } from "lucide-react"
 import { toast } from "react-hot-toast"
 import { DeploymentProvider } from "@/providers/deploymentProvider"
@@ -106,9 +107,19 @@ interface ECSConfig {
   healthCheckInterval: number
   healthCheckTimeout: number
   healthCheckRetries: number
+  logsEnabled?: boolean
   cpuReservation?: number
   memoryReservation?: number
   memoryHardLimit?: number
+
+  // Scheduler (start/stop)
+  schedulerEnabled?: boolean
+  schedulerStartCron?: string
+  schedulerStopCron?: string
+  schedulerStartDesiredCount?: number
+  schedulerStartTime?: string
+  schedulerStopTime?: string
+  schedulerDays?: string[]
 }
 
 interface CodeFile {
@@ -182,11 +193,20 @@ export default function CloudInterface() {
     logStreamPrefix: "ecs",
     environmentVariables: [],
     secrets: [],
+    logsEnabled: true,
     healthCheckEnabled: true,
     healthCheckPath: "/health",
     healthCheckInterval: 30,
     healthCheckTimeout: 5,
     healthCheckRetries: 3,
+
+    schedulerEnabled: false,
+    schedulerStartCron: "cron(0 8 ? * MON-SUN *)",
+    schedulerStopCron: "cron(0 20 ? * MON-SUN *)",
+    schedulerStartDesiredCount: 1,
+    schedulerStartTime: "08:00",
+    schedulerStopTime: "20:00",
+    schedulerDays: ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"],
   })
 
   const [lambdaConfig, setLambdaConfig] = useState<LambdaConfig>({
@@ -279,6 +299,63 @@ exports.handle_funcion = async (event, context) => {
     username: "",
     password: ""
   })
+
+  const renderDomainHeader = () => {
+    return (
+      <Card className="border-blue-100 bg-blue-50/60 shadow-sm">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-blue-900">
+            <Globe className="h-5 w-5" />
+            Domain configuration
+          </CardTitle>
+          <CardDescription className="text-sm">
+            Define the main domain you want to use for your deployment. This domain will be associated with the service you select (PageDrop, SkyBox or Zaplet).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="space-y-2">
+            <Label>Domain Name</Label>
+            <div className="flex gap-2">
+              <Input
+                placeholder="myapp.com"
+                value={ecsConfig.domainName}
+                onChange={(e) => {
+                  setECSConfig({ ...ecsConfig, domainName: e.target.value })
+                  const timeoutId = setTimeout(() => {
+                    checkDomainAvailability(e.target.value)
+                  }, 1000)
+                  return () => clearTimeout(timeoutId)
+                }}
+              />
+              {isCheckingDomain && (
+                <Button variant="outline" disabled>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                </Button>
+              )}
+            </div>
+            {domainAvailability && (
+              <div
+                className={`mt-2 p-2 rounded-md text-sm ${
+                  domainAvailability.available
+                    ? "bg-green-50 text-green-800 border border-green-200"
+                    : "bg-red-50 text-red-800 border border-red-200"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  {domainAvailability.available ? (
+                    <span className="text-green-600">✓</span>
+                  ) : (
+                    <span className="text-red-600">✗</span>
+                  )}
+                  <span>{domainAvailability.message}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   // Helper functions for available CPU/Memory options for Docker images
   const ECS_CPU_OPTIONS = [128, 256, 512, 1024, 2048, 4096, 8192, 16384]
@@ -432,6 +509,16 @@ exports.handle_funcion = async (event, context) => {
     },
   ]
 
+  const WEEK_DAYS = [
+    { id: "MON", label: "Mon" },
+    { id: "TUE", label: "Tue" },
+    { id: "WED", label: "Wed" },
+    { id: "THU", label: "Thu" },
+    { id: "FRI", label: "Fri" },
+    { id: "SAT", label: "Sat" },
+    { id: "SUN", label: "Sun" },
+  ]
+
   const awsRegions = [
     {
       id: "us-east-1",
@@ -512,6 +599,18 @@ exports.handle_funcion = async (event, context) => {
     { value: "go1.x", label: "Go 1.x" },
     { value: "ruby2.7", label: "Ruby 2.7" },
   ]
+
+  const buildCronExpression = (time: string | undefined, days: string[] | undefined) => {
+    if (!time) return null
+    const [hourStr, minuteStr] = time.split(":")
+    const hour = Number(hourStr)
+    const minute = Number(minuteStr)
+    if (Number.isNaN(hour) || Number.isNaN(minute)) return null
+
+    const normalizedDays = days && days.length > 0 && days.length < 7 ? days.join(",") : "MON-SUN"
+    // AWS cron: minute hour day-of-month month day-of-week year
+    return `cron(${minute} ${hour} ? * ${normalizedDays} *)`
+  }
 
   const renderServiceConfiguration = () => {
     switch (selectedService) {
@@ -598,55 +697,11 @@ exports.handle_funcion = async (event, context) => {
                   <TabsTrigger value="cluster">Cluster</TabsTrigger>
                   <TabsTrigger value="task">Task Definition</TabsTrigger>
                   <TabsTrigger value="service">Service</TabsTrigger>
-                  <TabsTrigger value="advanced">Advanced</TabsTrigger>
+                  <TabsTrigger value="scheduler">Scheduler (Programador)</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="cluster" className="space-y-6 mt-6">
                   <div className="space-y-4">
-
-
-                    <div className="space-y-2">
-                      <Label>Domain Name</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          placeholder="myapp.com"
-                          value={ecsConfig.domainName}
-                          onChange={(e) => {
-                            setECSConfig({ ...ecsConfig, domainName: e.target.value })
-                            // Check domain availability when user stops typing
-                            const timeoutId = setTimeout(() => {
-                              checkDomainAvailability(e.target.value)
-                            }, 1000)
-                            return () => clearTimeout(timeoutId)
-                          }}
-                        />
-                        {isCheckingDomain && (
-                          <Button variant="outline" disabled>
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          </Button>
-                        )}
-                      </div>
-                      {domainAvailability && (
-                        <div className={`mt-2 p-2 rounded-md text-sm ${domainAvailability.available
-                            ? 'bg-green-50 text-green-800 border border-green-200'
-                            : 'bg-red-50 text-red-800 border border-red-200'
-                          }`}>
-                          <div className="flex items-center gap-2">
-                            {domainAvailability.available ? (
-                              <span className="text-green-600">✓</span>
-                            ) : (
-                              <span className="text-red-600">✗</span>
-                            )}
-                            <span>{domainAvailability.message}</span>
-                          </div>
-                          {/* {domainAvailability.available && domainAvailability.price && (
-                            <div className="mt-1 text-xs">
-                              Price: ${domainAvailability.price}/year
-                            </div>
-                          )} */}
-                        </div>
-                      )}
-                    </div>
                     <div className="space-y-2">
                       <Label>Deployment Name</Label>
                       <Input
@@ -682,25 +737,26 @@ exports.handle_funcion = async (event, context) => {
                 <TabsContent value="task" className="space-y-4 mt-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-base font-semibold">CPU (vCPU)</Label>
-                      <Badge variant="secondary" className="text-xs px-2 py-1">{ecsConfig.taskCpu}</Badge>
-                      <Select
-                        value={ecsConfig.taskCpu.toString()}
-                        onValueChange={(value) => setECSConfig({ ...ecsConfig, taskCpu: Number.parseInt(value) })}
-                      >
-                        <SelectTrigger className="h-9 text-sm font-normal border rounded-md">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="text-sm">
-                          <SelectItem value="256">0.25 vCPU (256)</SelectItem>
-                          <SelectItem value="512">0.5 vCPU (512)</SelectItem>
-                          <SelectItem value="1024">1 vCPU (1024)</SelectItem>
-                          <SelectItem value="2048">2 vCPU (2048)</SelectItem>
-                          <SelectItem value="4096">4 vCPU (4096)</SelectItem>
-                          <SelectItem value="8192">8 vCPU (8192)</SelectItem>
-                          <SelectItem value="16384">16 vCPU (16384)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <div className="flex items-center justify-between text-xs text-slate-600">
+                        <span>CPU (vCPU)</span>
+                        <span className="font-semibold text-slate-800">
+                          {ecsConfig.taskCpu / 1024} vCPU ({ecsConfig.taskCpu})
+                        </span>
+                        <Slider
+                        value={[
+                          Math.max(0, ECS_CPU_OPTIONS.indexOf(ecsConfig.taskCpu || ECS_CPU_OPTIONS[1])),
+                        ]}
+                        min={0}
+                        max={ECS_CPU_OPTIONS.length - 1}
+                        step={1}
+                        onValueChange={(value) => {
+                          const idx = value[0] ?? 0
+                          const cpu = ECS_CPU_OPTIONS[idx] ?? ECS_CPU_OPTIONS[0]
+                          setECSConfig({ ...ecsConfig, taskCpu: cpu })
+                        }}
+                      />
+                    
+                    </div>
                     </div>
                     <div className="space-y-2">
                       <Label className="text-base font-semibold">Memoria (MB)</Label>
@@ -1043,130 +1099,170 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                   )}
                 </TabsContent>
 
-                <TabsContent value="advanced" className="space-y-6 mt-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Service Name</Label>
-                      <Input
-                        placeholder="my-service"
-                        value={ecsConfig.serviceName}
-                        onChange={(e) => setECSConfig({ ...ecsConfig, serviceName: e.target.value })}
-                      />
-                      <p className="text-xs text-slate-500">If empty, it will be generated automatically</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Task Definition Family</Label>
-                      <Input
-                        placeholder="my-task-definition"
-                        value={ecsConfig.taskDefinitionFamily}
-                        onChange={(e) => setECSConfig({ ...ecsConfig, taskDefinitionFamily: e.target.value })}
-                      />
-                      <p className="text-xs text-slate-500">If empty, it will be generated automatically</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Container Port</Label>
-                      <Input
-                        type="number"
-                        placeholder="80"
-                        value={ecsConfig.containerPort}
-                        onChange={(e) => setECSConfig({ ...ecsConfig, containerPort: Number.parseInt(e.target.value) })}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Protocol</Label>
-                      <Select
-                        value={ecsConfig.protocol}
-                        onValueChange={(value) => setECSConfig({ ...ecsConfig, protocol: value })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="tcp">TCP</SelectItem>
-                          <SelectItem value="udp">UDP</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Subnets</Label>
-                      <Input
-                        placeholder="subnet-12345678,subnet-87654321"
-                        value={ecsConfig.subnets.join(',')}
-                        onChange={(e) => setECSConfig({ ...ecsConfig, subnets: e.target.value.split(',').filter(s => s.trim()) })}
-                      />
-                      <p className="text-xs text-slate-500">Comma separated</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Security Groups</Label>
-                      <Input
-                        placeholder="sg-12345678,sg-87654321"
-                        value={ecsConfig.securityGroups.join(',')}
-                        onChange={(e) => setECSConfig({ ...ecsConfig, securityGroups: e.target.value.split(',').filter(s => s.trim()) })}
-                      />
-                      <p className="text-xs text-slate-500">Comma separated</p>
-                    </div>
-                  </div>
-
+                <TabsContent value="scheduler" className="space-y-6 mt-6">
                   <div className="space-y-4">
+                    <h4 className="font-medium">Scheduler</h4>
                     <div className="flex items-center space-x-2">
                       <Switch
-                        checked={ecsConfig.assignPublicIp}
-                        onCheckedChange={(checked) => setECSConfig({ ...ecsConfig, assignPublicIp: checked })}
+                        checked={Boolean(ecsConfig.schedulerEnabled)}
+                        onCheckedChange={(checked) => setECSConfig({ ...ecsConfig, schedulerEnabled: checked })}
                       />
-                      <Label>Assign Public IP</Label>
+                      <Label>Enable scheduled start/stop</Label>
+                      <span className="text-xs text-slate-500">
+                        Schedule the service to automatically start and stop at the chosen times (UTC).
+                      </span>
                     </div>
 
-                    <div className="flex items-center space-x-2">
+                    {ecsConfig.schedulerEnabled && (
+                      <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                  
+                                <div className="space-y-2">
+                                      <div className="flex items-center gap-2">
+                                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100 text-green-700">
+                              <Power className="h-4 w-4" />
+                                   </div>
+                                        <span className="font-medium">Start time</span>
+                                      </div>
+                                <div className="flex flex-col md:flex-row md:items-center md:gap-4 gap-2">
+                            <Input
+                              type="time"
+                              className="md:w-40"
+                              value={ecsConfig.schedulerStartTime || "08:00"}
+                              onChange={(e) =>
+                                setECSConfig({
+                                  ...ecsConfig,
+                                  schedulerStartTime: e.target.value,
+                                })
+                              }
+                            />
+                            
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs text-slate-600">Every:</span>
+                              {WEEK_DAYS.map((day) => {
+                                const selected = ecsConfig.schedulerDays?.includes(day.id) ?? true
+                                return (
+                                  <Button
+                                    key={day.id}
+                                    type="button"
+                                    size="sm"
+                                    variant={selected ? "default" : "outline"}
+                                    className={selected ? "bg-blue-600 text-white h-7 px-3" : "h-7 px-3"}
+                                    onClick={() => {
+                                      const current = ecsConfig.schedulerDays || WEEK_DAYS.map((d) => d.id)
+                                      const exists = current.includes(day.id)
+                                      const nextDays = exists
+                                        ? current.filter((d) => d !== day.id)
+                                        : [...current, day.id]
+                                      setECSConfig({
+                                        ...ecsConfig,
+                                        schedulerDays: nextDays,
+                                      })
+                                    }}
+                                  >
+                                    {day.label}
+                                  </Button>
+                                )
+                              })}
+                            </div>
+                            </div>
+                    </div>
+                    <Separator />
+                    <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100 text-red-700">
+                              <Power className="h-4 w-4" />
+                            </div>
+                            <span className="font-medium">Stop time</span>
+                          </div>
+                          <div className="flex flex-col md:flex-row md:items-center md:gap-4 gap-2">
+                      <Input
+                              type="time"
+                              className="md:w-40"
+                              value={ecsConfig.schedulerStopTime || "20:00"}
+                              onChange={(e) =>
+                                setECSConfig({
+                                  ...ecsConfig,
+                                  schedulerStopTime: e.target.value,
+                                })
+                              }
+                            />
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs text-slate-600">Every:</span>
+                              {WEEK_DAYS.map((day) => {
+                                const selected = ecsConfig.schedulerDays?.includes(day.id) ?? true
+                                return (
+                                  <Button
+                                    key={day.id}
+                                    type="button"
+                                    size="sm"
+                                    variant={selected ? "default" : "outline"}
+                                    className={selected ? "bg-blue-600 text-white h-7 px-3" : "h-7 px-3"}
+                                    onClick={() => {
+                                      const current = ecsConfig.schedulerDays || WEEK_DAYS.map((d) => d.id)
+                                      const exists = current.includes(day.id)
+                                      const nextDays = exists
+                                        ? current.filter((d) => d !== day.id)
+                                        : [...current, day.id]
+                                      setECSConfig({
+                                        ...ecsConfig,
+                                        schedulerDays: nextDays,
+                                      })
+                                    }}
+                                  >
+                                    {day.label}
+                                  </Button>
+                                )
+                              })}
+                    </div>
+                  </div>
+                    </div>
+                  </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+               
+                      <h4 className="font-medium">Logs Configuration</h4>
+                      <div className="flex items-center space-x-2">
                       <Switch
-                        checked={ecsConfig.essential}
-                        onCheckedChange={(checked) => setECSConfig({ ...ecsConfig, essential: checked })}
+                        checked={ecsConfig.logsEnabled ?? true}
+                        onCheckedChange={(checked) => setECSConfig({ ...ecsConfig, logsEnabled: checked })}
                       />
-                      <Label>Essential Container</Label>
+                      <span className="text-sm text-slate-700">Enable CloudWatch logs</span>
                     </div>
+                    {ecsConfig.logsEnabled && (
+                       <div className="mt-2 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                         <div className="space-y-2">
+                           <Label>Log Group</Label>
+                           <Input
+                             placeholder="/ecs/my-application"
+                             value={ecsConfig.logGroup}
+                             onChange={(e) => setECSConfig({ ...ecsConfig, logGroup: e.target.value })}
+                           />
+                         </div>
+                         <div className="space-y-2">
+                           <Label>Log Region</Label>
+                           <Input
+                             placeholder="us-east-1"
+                             value={ecsConfig.logRegion}
+                             onChange={(e) => setECSConfig({ ...ecsConfig, logRegion: e.target.value })}
+                           />
+                         </div>
+                         <div className="space-y-2">
+                           <Label>Log Stream Prefix</Label>
+                           <Input
+                             placeholder="ecs"
+                             value={ecsConfig.logStreamPrefix}
+                             onChange={(e) => setECSConfig({ ...ecsConfig, logStreamPrefix: e.target.value })}
+                           />
+                         </div>
+                       </div>
+                      </div>
+                    )}
                   </div>
 
-                  <Separator />
-
-                  <div className="space-y-4">
-                    <h4 className="font-medium">Logs Configuration</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label>Log Group</Label>
-                        <Input
-                          placeholder="/ecs/my-application"
-                          value={ecsConfig.logGroup}
-                          onChange={(e) => setECSConfig({ ...ecsConfig, logGroup: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Log Region</Label>
-                        <Input
-                          placeholder="us-east-1"
-                          value={ecsConfig.logRegion}
-                          onChange={(e) => setECSConfig({ ...ecsConfig, logRegion: e.target.value })}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Log Stream Prefix</Label>
-                        <Input
-                          placeholder="ecs"
-                          value={ecsConfig.logStreamPrefix}
-                          onChange={(e) => setECSConfig({ ...ecsConfig, logStreamPrefix: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <Separator />
+                  
 
                   <div className="space-y-4">
                     <h4 className="font-medium">Health Check</h4>
@@ -1439,12 +1535,22 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
 
       // Agregar configuración específica del servicio
       switch (selectedService) {
-        case "ecs":
+        case "ecs": {
+          const startCron = buildCronExpression(ecsConfig.schedulerStartTime, ecsConfig.schedulerDays)
+          const stopCron = buildCronExpression(ecsConfig.schedulerStopTime, ecsConfig.schedulerDays)
+
           deploymentData = {
             ecs_config: {
               ...ecsConfig,
               isRepoPrivate: isPrivateRegistry,
               privateRegistryCredentials: isPrivateRegistry ? privateRegistryCredentials : undefined,
+              domain_name: ecsConfig.domainName,
+              scheduler: {
+                enabled: Boolean(ecsConfig.schedulerEnabled),
+                start_cron: startCron ?? ecsConfig.schedulerStartCron,
+                stop_cron: stopCron ?? ecsConfig.schedulerStopCron,
+                start_desired_count: ecsConfig.schedulerStartDesiredCount ?? ecsConfig.desiredCount,
+              },
               environmentVariables: [
                 ...ecsConfig.environmentVariables,
                 { name: "MYSQL_ROOT_PASSWORD", value: databaseCredentials.rootPassword },
@@ -1460,6 +1566,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
             domain_name: ecsConfig.domainName, // Add domain name to deployment data
           }
           break
+        }
 
         case "pagedrop":
           deploymentData = {
@@ -1467,6 +1574,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
             name: `pagedrop-${Date.now()}`,
             docker_image: `${dockerImages[0].name}:${dockerImages[0].tag}`,
             port: dockerImages[0].port,
+            domain_name: ecsConfig.domainName,
           }
           break
 
@@ -1481,6 +1589,7 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
             environment_vars: lambdaConfig.environmentVars,
             trigger: lambdaConfig.trigger,
             dead_letter_queue: lambdaConfig.deadLetterQueue,
+            domain_name: ecsConfig.domainName,
             code_files: lambdaConfig.codeFiles.map((file: CodeFile) => ({
               name: file.name,
               content: file.content,
@@ -1606,6 +1715,9 @@ DB_PASSWORD = os.environ.get(f'{DB_ENGINE_TYPE}_PASSWORD')`}
                 </div>
               </CardContent>
             </Card>
+
+            {/* Shared domain header for all services */}
+            {renderDomainHeader()}
 
             {/* Service-specific Configuration */}
             {renderServiceConfiguration()}
